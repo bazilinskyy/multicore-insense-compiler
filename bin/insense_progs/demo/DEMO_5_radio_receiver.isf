@@ -1,0 +1,102 @@
+// Simple Insense program to receive data from radio and print it out
+
+// Sensor reading type
+type sensorReading is struct( address addr ; integer cycle ; integer photo ; integer solar ; integer temp ; integer humid )
+
+type IReceiver is interface ( in RadioPacket radioChan ; out sensorReading printerChan ; out sensorReading ledsChan)
+
+// Sensor reader component
+component Receiver presents IReceiver {
+
+	constructor() {	
+	}
+		
+	behaviour {
+	
+		// get something from the radio
+		receive packet from radioChan
+		printString("\n")
+		printUnsignedInt(packet.addr)
+		// project out of any
+		project packet.payload as value onto
+			sensorReading : { 
+				send value on ledsChan 
+				send value on printerChan
+			}
+			default : {
+				printString(" - sent garbage!")
+			}		
+	}
+} 
+
+// Interface for Printer component sending readings 
+// and explanatory text to standard output
+type IPrinter is interface ( in sensorReading input ; out any stdOutChan)
+
+// Standard output and radio printer component
+component Printer presents IPrinter {
+
+	constructor() {	
+	}
+		
+	behaviour {
+		// get reading struct
+		receive reading from input
+		
+		// send text+readings in struct on stdout
+		printString(": N")
+		printUnsignedInt(reading.addr)
+		printString(", It ")
+		printInt(reading.cycle)
+		printString(": photo = ")
+		printInt(reading.photo)
+		printString(", solar = ")
+		printInt(reading.solar)
+		printString(", temp = ")
+		printInt(reading.temp)
+		printString(", humid = ")
+		printInt(reading.humid)
+	}
+} 
+
+//Interface for LED output component
+type ILedOutput is interface ( in sensorReading input )
+
+//LED output component
+component LedOutput presents ILedOutput {
+
+	avgTemp = 0
+	avgSolar = 0
+	avgHumid = 0
+	
+	constructor() {	
+	}
+		
+	behaviour {
+		// get sensor readings
+		receive reading from input 
+
+		// represent readings via LEDs, R/G/B for high Temp/Humidity/Light 
+		setBlueLedPower((reading.solar - avgSolar) > 20)
+		setGreenLedPower((reading.humid - avgHumid ) > 20)
+		setRedLedPower((reading.temp - avgTemp) > 20)
+		
+		// adjust averages
+		avgTemp := avgTemp + (reading.temp - avgTemp)/4
+		avgHumid := avgHumid + (reading.humid - avgHumid)/2
+		avgSolar := avgSolar + (reading.solar - avgSolar)/8
+	}
+} 
+
+
+
+
+rcvr = new Receiver()
+pr = new Printer()
+lo = new LedOutput()
+
+connect rcvr.radioChan to radio.received
+connect rcvr.ledsChan to lo.input
+connect rcvr.printerChan to pr.input
+
+

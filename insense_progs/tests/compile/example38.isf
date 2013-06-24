@@ -1,0 +1,31 @@
+// Example 38 - any test
+// 15/2/07
+// Alan Dearle
+
+type stdout is interface( out string output )
+
+component Receiver presents stdout {
+	
+	constructor() {
+	}
+	
+	
+	behaviour {
+		a = 7
+		b = true
+		c = any( a )
+		d = any( b )
+		e = c
+		f = d
+		project f as g onto
+			integer : { x = g }
+			bool : { x = g }
+		default : { x = 3 }
+	}
+}
+
+
+
+
+
+

@@ -1,0 +1,34 @@
+// Tests 2 behaviour decls
+
+type foo is interface( in integer input; out string trace )
+
+component Receiver presents foo  {
+
+	a = 0
+	
+	proc f( integer a ) : integer {
+		return 3
+	}
+	
+	
+	constructor() {
+	}
+	
+	
+	behaviour {
+		a := f(7)
+	}
+	
+	behaviour {
+		a := f(7)
+	 }
+	
+}
+
+
+
+
+
+
+
+

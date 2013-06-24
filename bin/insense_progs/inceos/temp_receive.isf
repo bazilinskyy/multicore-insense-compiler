@@ -1,0 +1,29 @@
+// Simple Insense program that receives temperature readings from the radio 
+
+// Interface for TempReceiver
+type ITempReceiver is interface ( in RadioPacket radioReceive )
+
+// Temp Receiver component
+component TempReceiver presents ITempReceiver {
+	
+	constructor() {
+	}
+	
+	behaviour {
+		// wait for packet from Radio
+		receive packet from radioReceive
+		
+		// Print out packet address and payload
+		printString("Got reading from node ")
+		printUnsignedInt(packet.addr)
+		printString(": ")
+		project packet.payload as reading onto
+			integer	: { printInt(  reading ) }
+			real 	: { printReal( reading ) }
+			default : { printString( "???" ) }
+		printString("\n")
+	}
+} 
+
+tr = new TempReceiver()
+connect tr.radioReceive to radio.received

@@ -1,0 +1,20 @@
+// Simple component 
+
+type t1 is interface( out integer output )
+
+component Ints presents t1 {
+	
+	last = 0;
+	
+	constructor() {
+	}
+	
+	behaviour {
+		send last on output
+		last := last + 1
+	}
+}
+
+ 
+
+

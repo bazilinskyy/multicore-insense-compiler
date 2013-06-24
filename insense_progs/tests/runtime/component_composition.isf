@@ -1,0 +1,96 @@
+
+
+// Interface for output component
+type IOutput is interface ( in real input )
+
+// Standard output printer component
+component PrintOutput presents IOutput {
+
+	cycle = 0
+	
+	constructor() {	
+	}
+		
+	behaviour {
+		// get real value
+		receive value from input
+		// send text+readings in struct on stdout
+		printAny(any("\nCycle "))
+		printAny(any(cycle))
+		printAny(any(":\tvalue = "))
+		printAny(any(value))
+		// increment cycle counter
+		cycle := cycle + 1
+	}
+} 
+
+
+
+
+// LED output component
+component LedOutput presents IOutput {
+
+	avg = 0.0
+	
+	constructor() {	
+	}
+		
+	behaviour {
+		// turn of all LEDs using led setState channel
+		setLeds(RedOffGreenOffBlueOff)
+			
+		// get sensor reading
+		receive value from input 
+
+		// represent readings via LEDs, R/G/B for high Temp/Humidity/Light
+		if (value - avg) > 5 then {
+			setGreenLedPower(true)
+		} else {
+			setRedLedPower(true)
+		}
+		// adjust averages
+		if value > avg then { avg := avg + 0.1 }
+		else { avg := avg - 0.1 }
+	}
+} 
+
+
+// Interface for Sensor Reader
+type ISensorReader is interface (out bool requestChan ; in real valueChan ; out real output )
+
+// Sensor reader component
+component SensorReader presents ISensorReader, ISchedulable {
+	
+	constructor(integer dutyCycle ; IOutput outputter) {
+		periodicEnSchedule( inTicksChan, dutyCycle )
+		connect output to outputter.input
+	}
+		
+	behaviour {
+		receive tick from inTicksChan
+		send true on requestChan
+		receive value from valueChan 
+		send value on output
+	}
+} 
+
+
+
+lo = new LedOutput()
+po = new PrintOutput()
+sr = new SensorReader(1, po)
+
+// wiring the sensor reader to a specific sensor
+// connect temperature sensor
+connect sr.requestChan to lightHumidTempSensor.tempRequest
+connect sr.valueChan to lightHumidTempSensor.tempOutput
+// connect to humidity sensor
+//connect sr.requestChan to lightHumidTempSensor.humidRequest
+//connect sr.valueChan to lightHumidTempSensor.humidOutput
+
+// connect output to printer
+//connect sr.output to po.input
+
+// connect output to led output
+//connect sr.output to lo.input
+

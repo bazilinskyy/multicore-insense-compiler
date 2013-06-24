@@ -1,0 +1,31 @@
+
+type IComponent is interface ( out integer output ) 
+
+component Comp presents IComponent {
+
+	constructor() { }
+	
+	behaviour {
+		
+		i = 0
+		if i == 0 then {
+			c = 1
+			//str = "hello"
+		} 
+		if i == 0 then {
+			c = 1
+			//str = "hello"
+		} 
+//		if i == 1 then {
+//			c = 2
+//			d = 3
+//		} else {
+//			c = 3
+//			d = 4
+//			e = 5
+//			i := c
+//		}
+	}
+}
+
+comp = new Comp()

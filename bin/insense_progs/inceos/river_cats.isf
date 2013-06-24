@@ -1,0 +1,204 @@
+/*
+ * Application to collect sensor readings from accelorometer + tilt sensors
+ * save them in external flash
+ * and dump them back across the radio when requested
+ */ 
+ 
+ /*-------------------------------------------------------------------------*/
+ type msgType is enum (start, halt, ping, space, erase, dump, startDone, haltDone, spaceDone, eraseDone, dumpDone)
+ type nodeReplyMsg is struct(msgType class ; unsigned value)
+ /*-------------------------------------------------------------------------*/
+ proc createRadioPacket (unsigned dest ; msgType m ; unsigned v ) : RadioPacket {
+ 
+		nrm = new nodeReplyMsg(m, v)
+		p = new RadioPacket(dest , any(nrm))
+		return p
+}
+/*-------------------------------------------------------------------------*/
+type IdataGather is interface( 	    out streamReq axReq  ; in integer[] axVal ;
+									out streamReq ayReq  ; in integer[] ayVal ;
+									out streamReq txReq  ; in integer[] txVal ;
+									out streamReq tyReq  ; in integer[] tyVal ;
+									in  bool controller  ;
+									out writeStruct writeChan)
+
+component dataGather presents IdataGather {
+	
+	period    = 2000
+	count 	  = 0
+
+	//An array for each stream
+	accelXArray = new integer[10] of 0
+	accelYArray = new integer[10] of 0
+	tiltXArray  = new integer[10] of 0
+	tiltYArray  = new integer[10] of 0
+	
+	//The pre stream request to be sent to each component
+	accelx = new streamReq(period, accelXArray)
+	accely = new streamReq(period, accelYArray)
+	tiltx  = new streamReq(period, tiltXArray)
+	tilty  = new streamReq(period, tiltYArray)
+
+	running = false
+	offset = $0
+	
+	write = new writeStruct(accelXArray, offset)
+	
+	constructor(){
+	}
+	
+	behaviour {
+		
+		printString("Data loop\n")
+		//Get info from the controller to start or stop
+		if (!running) then {
+			receive message from controller
+			running := message
+			setRedLedPower(running)
+		}
+		else if (running) then {
+			select {
+				receive message from controller : { 
+					running := message
+					setRedLedPower(running)
+				}
+				default: {}
+			}
+		}
+
+		/*
+		* using the stream sensors, collect buffer of sensor readings
+		*/
+		printString("sensor request\n")
+		send  accelx on axReq
+		send  accely on ayReq
+		send  tiltx  on txReq
+		send  tilty  on tyReq
+		
+		printString("sensor reply\n")
+		receive ax from axVal
+		receive ay from ayVal
+		receive tx from txVal
+		receive ty from tyVal
+		
+		/*
+		* Now write these values to flash
+		*
+		* impl issue: actual space consumption is double the offset specified
+		*/ 
+		printString("storage save\n")
+		/*
+		write.buffer := ax
+		write.offset := offset
+		send write on writeChan
+		//offset := offset + (ax.length * 2) //% MAX_MEM_SIZE
+		
+		write.buffer := ay
+		write.offset := offset
+		send write on writeChan
+		//offset := offset + (ay.length * 2)//% MAX_MEM_SIZE
+		
+		write.buffer := tx
+		write.offset := offset
+		send write on writeChan
+		//offset := offset + (tx.length * 2)//% MAX_MEM_SIZE
+		
+		write.buffer := ty
+		write.offset := offset
+		send write on writeChan
+		//offset := offset + (ty.length * 2)//% MAX_MEM_SIZE
+		*/
+	}
+}
+/*-------------------------------------------------------------------------*/
+/*
+* This component will be responsible for listening to the radio and servicing requests 
+* which come from the base station
+*/
+
+type Icontrol is interface(in RadioPacket ether ; out RadioPacket baseStation ; out bool controlChan ; out eraseStruct eraseChan ; out bool dataSizeReq ; in unsigned dataSizeVal)
+
+component control presents Icontrol{
+
+	//we only ever request to erase all flash so the size is 1MB
+	//eraseMsg = new eraseStruct(/* size of flash*/, offset )
+	eraseMsg = new eraseStruct($5, $0 )
+	
+	//r = new RadioPacket($0, any(0))
+	
+	constructor(){}
+	
+	behaviour{
+	
+		printString("control: begin\n")
+		
+		receive packet from ether
+		
+		printString("got packet from ether\n")
+		
+		//what type of message did the packet contain?
+		project packet.payload as message onto
+			msgType : {
+				// start message: start logging
+				if message == start then {
+					printString("start\n")
+					send true on controlChan
+				}
+				
+				// stop message: stop logging
+				else if message == halt then {
+					printString("halt/n")
+					send false on controlChan
+				}
+								
+				//ping message: reply with ID
+				else if message == ping then {
+					printString("ping\n")
+					send createRadioPacket(packet.addr, ping, getNodeAddress()) on baseStation
+				}
+				
+				//available flash space message: how much data have we stored
+				else if message == space then {
+					printString("space\n")
+					//send true on dataSizeReq
+					//receive val from dataSizeVal
+					
+					//r := new RadioPacket(packet.addr, any(new nodeReplyMsg(space, val))
+					//send createRadioPacket(packet.addr, space, val) on baseStation
+				}
+				
+				//clear flash message: erase all stored data (there should be a counter for this in storage.c)
+				else if message == erase then {
+					printString("erase\n")
+					//send eraseMsg on eraseChan
+				}
+				
+				//dump message: send all stored data to base
+				else if message == dump then {
+					printString("dump\n")
+					//how does this get done with callumn
+				}
+			}
+			// always need a default
+			default : {}	
+	}
+}
+/*-------------------------------------------------------------------------*/
+ctl = new control()
+collector = new dataGather()
+/*-------------------------------------------------------------------------*/
+connect ctl.ether       to radio.received
+connect ctl.baseStation to radio.unicastSend		//reliable
+connect ctl.controlChan to collector.controller
+connect ctl.eraseChan   to storage.eraseReq		//erase
+/*-------------------------------------------------------------------------*/
+connect collector.axReq  to accelxSensor.request
+connect collector.ayReq  to accelySensor.request
+connect collector.txReq  to tiltxSensor.request
+connect collector.tyReq  to tiltySensor.request
+
+connect collector.axVal  to accelxSensor.val
+connect collector.ayVal  to accelySensor.val
+connect collector.txVal  to tiltxSensor.val
+connect collector.tyVal  to tiltySensor.val
+

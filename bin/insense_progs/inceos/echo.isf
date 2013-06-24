@@ -1,0 +1,18 @@
+	
+type IEcho is interface( )
+	
+component Echo presents IEcho {
+
+	constructor(){
+	}
+	
+	behaviour {
+		s = getString()
+		printString(s)
+	}
+}
+
+// Insense main
+
+echo = new Echo()
+

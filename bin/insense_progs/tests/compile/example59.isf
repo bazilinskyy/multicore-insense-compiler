@@ -1,0 +1,39 @@
+// Tests copy copy on send for complex types.
+
+type person is struct( string name; integer age )
+
+type foo is interface( out person people )
+type bah is interface( in person people )
+
+component Connect1 presents foo {
+	
+	constructor() {
+	}
+	
+	behaviour {
+		p = new person( "al",47 )
+		send p on people
+	}
+}
+ 
+component Connect2 presents bah {
+	
+	constructor() {
+	}
+	
+	behaviour {
+		receive p from people
+	}
+}
+
+f = new Connect1();
+g = new Connect2();
+connect f.people to g.people;
+disconnect g.people
+
+
+
+
+
+
+

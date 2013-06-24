@@ -1,0 +1,43 @@
+// Tests match, receive etc. in simple real example
+
+type foo is interface( in integer input; out string trace )
+type bar is interface( out integer output )
+
+component Receiver presents foo  {
+
+	a = 0
+	b = ""
+	
+	proc f( integer a ) : integer {
+		return 3
+	}
+	
+	constructor() {
+	}
+	
+	
+	behaviour {
+		receive somedata from input
+		send "OK" on trace
+		a := f(7)
+	}
+}
+
+component Sender presents bar {
+	constructor() {
+	}
+	
+	behaviour {
+	    myval = 876
+		send myval on output
+		
+	}
+} 
+
+s = new Sender()
+r = new Receiver()
+
+stdout = new in string
+connect s.output to r.input
+connect r.trace to stdout
+

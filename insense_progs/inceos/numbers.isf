@@ -1,0 +1,43 @@
+	
+type INumbers is interface( )
+	
+component Numbers presents INumbers {
+
+	comma = ", "
+	cr = "\n"
+	
+	constructor(){
+	}
+	
+	behaviour {
+		r = -3.14
+		i = -28
+		b = #255
+		u = $64000
+		printReal(r) ; printString(comma)
+		printInt(i) ; printString(comma)
+		printByte(b); printString(comma)
+		printUnsignedInt(u) ; printString(cr)
+		
+		res1 = b + u
+		printUnsignedInt(res1) ; printString(comma)
+
+		res2 = i + b 
+		printInt(res2) ; printString(comma)
+
+		res3 = i + u
+		printInt(res3) ; printString(comma)
+		
+		res4 = intToUnsigned(res3)
+		printUnsignedInt(res4) ; printString(comma)
+		
+		res5 = r + (i + u)
+		printReal(res5) ; printString(cr)
+		
+		//stop
+	}
+}
+
+// Insense main
+
+numbers = new Numbers()

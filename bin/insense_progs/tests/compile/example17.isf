@@ -1,0 +1,11 @@
+// Tests function definition and call (multiple params and types)
+
+proc fn( integer i,b; string s ) : integer {
+	return i
+}
+
+ii = fn( 3,3,"hi" );
+
+
+
+

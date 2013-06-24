@@ -1,0 +1,37 @@
+	
+type ISender is interface( out string output )
+type IReceiver is interface ( in string input )
+	
+component Sender presents ISender {
+
+	mesg = ""
+
+	constructor(){
+	}
+	
+	constructor(string s) {
+		mesg := s
+	}
+
+	behaviour {
+		send mesg on output
+	}
+}
+
+
+component Receiver presents IReceiver {
+
+	constructor() {
+	}
+	
+	behaviour {
+		receive text from input
+		printAny(any(text))
+	}
+}
+
+// Insense main
+
+s = new Sender("InceOS is cool and running\n")
+r = new Receiver()
+connect s.output to r.input

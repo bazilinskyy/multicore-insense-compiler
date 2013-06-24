@@ -1,0 +1,111 @@
+
+type Reading is struct(integer cycle ; integer solar ; real temp)
+
+proc printReading(Reading data ; out any chan){
+	send (any("reading = ( cycle=")) on chan
+	send (any(data.cycle)) on chan
+	send (any(", solar=")) on chan
+	send (any(data.solar)) on chan
+	send (any(", temp=")) on chan
+	send (any(data.temp)) on chan
+	send (any(" )")) on chan
+}
+
+
+// Interface for Sender
+type IRucSender is interface (out RadioPacket radioChan ; out bool solarRequestChan ; in integer solarValueChan ;
+    out bool tempRequestChan ; in real tempValueChan ; in bool radioSuccessChan ; out byte[] radioSetNodeAddress ;
+    out bool radioSetPowerSupplyChan ; out any trace ; out bool redChan ; out bool greenChan)
+
+// RUC radio sender component
+component RucSender presents IRucSender, ISchedulable{
+
+	cycle = 0
+	dutyCycle = 0
+	nodeAddr = new byte[2] of #0
+	destAddr = new byte[2] of #0
+	
+	constructor(integer ds) {
+		// Make connections
+		connect solarRequestChan to lightHumidTempSensor.solarRequest
+		connect solarValueChan to lightHumidTempSensor.solarOutput
+		connect tempRequestChan to lightHumidTempSensor.tempRequest
+		connect tempValueChan to lightHumidTempSensor.tempOutput
+
+		connect redChan to leds.redState
+		connect greenChan to leds.greenState
+
+		connect radioChan to radioOut.runicast
+		connect radioSuccessChan to radioOut.success
+		connect radioSetNodeAddress to radio.setNodeAddress
+		connect radioSetPowerSupplyChan to radio.setPowerSupply
+		connect trace to standardOut
+
+		// set duty cycle time
+		dutyCycle := ds
+		// this node's address
+		nodeAddr[0] := #138 ; nodeAddr[1] := #1
+		// sink node's address
+		destAddr[0] := #1 ; destAddr[1] := #0
+		// setup ticker for given duty cycle
+		periodicEnSchedule( inTicksChan, dutyCycle )
+		// set sender's node address
+		//send nodeAddr on radioSetNodeAddress
+		// turn off radio until needed
+		send false on radioSetPowerSupplyChan
+	}
+		
+	behaviour {
+		// turn off LEDS
+		send false on redChan
+		send false on greenChan
+		
+		// wait for tick from timer
+		receive tick from inTicksChan
+
+		// get readings and build data packet
+		send true on solarRequestChan
+		receive solar from solarValueChan
+		send true on tempRequestChan
+		receive temp from tempValueChan
+		
+		reading = new Reading(cycle, solar, temp)
+		payload = (any(reading))
+		packet = new RadioPacket(destAddr, payload)
+		
+		// turn on radio
+		send true on radioSetPowerSupplyChan
+		
+		// send packet
+		send packet on radioChan
+
+		// print out trace info
+		
+		send(any("\nSent " )) on trace
+		printReading(reading, trace)
+		send(any(" to ")) on trace
+		send(any(destAddr[0])) on trace
+		send(any(".")) on trace
+		send(any(destAddr[1])) on trace
+
+		// wait for success or timeout
+		receive success from radioSuccessChan 
+		
+		// turn off radio
+		send false on radioSetPowerSupplyChan
+		
+		// flash green LED for success, RED otherwise
+		send success on greenChan
+		send !success on redChan
+
+		// print out whether we had success and 
+		send(any(" ... ")) on trace
+		send (any(success)) on trace
+ 
+		cycle := cycle + 1
+	}
+} 
+
+// create component instance that measures and sends data every 10 seconds
+rs = new RucSender(10) 
+

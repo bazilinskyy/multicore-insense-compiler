@@ -1,0 +1,13 @@
+type TempRouterIF is interface( in real input;
+								out real output )
+								
+component TempRouter presents TempRouterIF {
+
+	constructor() {
+	}
+
+	behaviour {
+		receive temp from input
+		send temp on output
+	}
+}

@@ -1,0 +1,26 @@
+// Select with decl
+
+type foo is interface( in integer ticker,tocker,tacker )
+
+component selectTest presents foo {
+	
+	p = #8
+	
+	s = p + p;
+	
+	constructor() {
+	}
+	
+	behaviour {
+		s = select {
+			receive x from ticker when p > 7 : x
+			receive y from tacker : y
+			receive z from tacker when p < 7 : z
+			default: 1
+		}
+	}
+
+}
+
+
+

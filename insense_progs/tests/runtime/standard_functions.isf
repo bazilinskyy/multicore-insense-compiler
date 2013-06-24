@@ -1,0 +1,142 @@
+// Simple Insense program testing functions
+
+// functions to be put into run-time
+
+type Person is struct(string name ; integer age)
+
+//proc avgIntArray(integer[] iarray) : real {
+//	avg = 0.0
+//	for i = 0 .. iarray.length-1 do{
+//		avg := avg + iarray[i]
+//	}
+//	return avg/iarray.length
+//}
+//
+//proc avgRealArray(real[] rarray) : real {
+//	avg = 0.0
+//	for i = 0 .. rarray.length-1 do{
+//		avg := avg + rarray[i]
+//	}
+//	return avg/rarray.length
+//}
+//
+//proc absInt(integer i) : integer {
+//	result = i
+//	if i<0 then
+//		result := -1*i
+//	return result
+//}
+//
+//proc absReal(real r) : real {
+//	result = r
+//	if r<0 then
+//		result := -1.0*r
+//	return result
+//}
+//
+//
+//proc squareInt(integer i) : integer {
+//	return i*i
+//}
+//
+//proc squareRoot(real r) : real {
+//	return 2.0
+//}
+//
+
+
+// end of functions to be put ito runtime
+
+proc printIArray(integer[] a; out any chan){
+	send (any("\nArray: [")) on chan
+	for i = 0 .. a.length-1 do {
+		send (any(a[i])) on chan
+		send (any(" ")) on chan
+	}
+	send (any("]")) on chan
+}
+
+
+proc printRArray(real[] a; out any chan){
+	send (any("\nArray: [")) on chan
+	for i = 0 .. a.length-1 do {
+		send (any(a[i])) on chan
+		send (any(" ")) on chan
+	}
+	send (any("]")) on chan
+}
+
+
+proc fillIArray(integer[] a ; integer start){
+	for i = 0 .. a.length-1 do {
+		a[i] := start + i
+	}
+}
+
+
+proc fillRArray(real[] a ; integer start){
+	for i = 0 .. a.length-1 do {
+		a[i] := start + 1.0*i
+	}
+}
+
+proc printPerson(Person p ; out any chan){
+	send(any("\nPerson (")) on chan
+	send(any(p.name)) on chan
+	send(any(", ")) on chan
+	send(any(p.age)) on chan
+	send(any(")")) on chan
+}
+
+
+// Interface for Sensor Reader
+type ITest is interface (out any trace)
+
+component Test presents ITest {
+
+	iarray = new integer[5] of 0
+	rarray = new real[5] of 0.0
+	start = -11
+	
+	constructor() {	
+	}
+		
+	behaviour {
+		fillIArray(iarray, start)
+		iavg = avgIntArray(iarray)
+		printIArray(iarray, trace)
+		send(any("\t iavg = ")) on trace
+		send(any(iavg)) on trace
+		send(any("\nabsInt(start) = ")) on trace
+		send(any(absInt(start))) on trace
+		send(any("\tsquareInt(start) = ")) on trace
+		send(any(squareInt(start))) on trace
+
+		fillRArray(rarray, start)
+		ravg = avgRealArray(rarray)
+		printRArray(rarray, trace)
+		send(any("\t ravg = ")) on trace
+		send(any(ravg)) on trace
+		send(any("\nabsReal(ravg) = ")) on trace
+		send(any(absReal(ravg))) on trace
+		send(any("\tsquareReal(ravg) = ")) on trace
+		send(any(squareReal(ravg))) on trace
+
+		send(any("\nstart = ")) on trace
+		send(any(start)) on trace
+		
+		send(any("\tsquareRoot(start*1.0) = ")) on trace
+		send(any(squareRoot(start*1.0))) on trace
+		
+		p = new Person("Jon", -1*start)
+		printPerson(p, trace)
+		
+		start := start + iarray.length
+
+
+	}
+} 
+
+
+te = new Test()
+connect te.trace to standardOut

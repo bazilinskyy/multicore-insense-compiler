@@ -1,0 +1,56 @@
+// Program to test procedures that return garbage collected data
+
+type Reading is struct(integer cycle ; real temp)
+
+proc printReading (Reading r) {
+	printInt(r.cycle)
+	printString(":")
+	printReal(r.temp)
+	printString("\n")
+}
+	
+
+proc testReturn( Reading src ) : Reading {
+	copy = new Reading(src.cycle, src.temp)
+	if src.cycle > 5 then {
+		str = "hello"
+		return copy
+	}
+	return src
+}
+
+// This is a bad procedure which should cause a compilation error 
+// due to lacking return statement on non-void procedure
+//proc badProcedure(integer i) : integer{
+//	i := i + 5
+//}
+
+proc copyReading( Reading src ) : Reading {
+	copy = new Reading(src.cycle, src.temp)
+	return copy
+}
+
+
+
+// Interface for Hello component
+type ITest is interface ( )
+
+// Hello World component
+component Test presents ITest {
+
+	count = 1
+	val = 19.2
+
+	constructor(){
+	}
+	
+	behaviour {
+		r = new Reading(count, val)
+		r2 = copyReading(r)
+		printReading(copyReading(r))
+		count := count + 1
+		val := val + 0.216
+	}	
+} 
+
+test = new Test()

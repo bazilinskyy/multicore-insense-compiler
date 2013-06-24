@@ -1,0 +1,247 @@
+/*
+* This will gather some sort of grid stuff
+*/
+
+//struct to distribut workloads
+type workPacket is struct (unsigned id ; unsigned workNum ; integer[] work)
+
+type replyPacket is struct ( unsigned id ; unsigned workNum ; integer answer )
+
+type ackPacket is struct (unsigned id ; bool state)
+
+type requestPacket is struct (unsigned id)
+
+//enum for the type of component to create
+type compType is enum (mstr, slave, other)
+/*------------------------------------------------------------------*/
+proc createReplyPacket (unsigned id ; unsigned dest ; unsigned workNum ; integer ans) : RadioPacket {
+
+		r = new replyPacket(id, workNum,  ans)
+		p = new RadioPacket(dest , any(r))
+		return p
+}
+/*------------------------------------------------------------------*/
+proc createWorkPacket (unsigned  dest ; unsigned id ; unsigned workNum ; integer[] work) : RadioPacket {
+
+		r = new workPacket(id, workNum,  work)
+        p = new RadioPacket(dest, any(r))
+		return p
+}
+/*------------------------------------------------------------------*/
+/*proc createRequestPacket (unsigned id ) : requestPacket {
+
+		r = new requestPacket(id)
+		return r
+}*/
+/*------------------------------------------------------------------*/
+proc createAckPacket (unsigned id ; unsigned dest ;bool state ) : RadioPacket {
+
+		r = new ackPacket(id, state)
+		p = new RadioPacket(dest , any(r))
+		return p
+}
+/*------------------------------------------------------------------*/
+//interface for the grid node component
+type gridNodeI is interface (out RadioPacket ucast ; 
+                             in  workPacket workChan ;
+                             in  requestPacket reqChan )
+        
+component gridNode presents gridNodeI {
+
+	constructor() {
+	}
+	
+	behaviour {
+
+                select {
+                        receive reading from workChan : {
+
+                               // printString("Slave running ....\n Got packet of size ")
+                               // printInt(reading.work.length)
+                              //  printString("\n")
+									
+                                //process the data
+                                ifft(reading.work, reading.work.length)
+
+								//printString("Slave : find the max value\n")
+								
+                                max = 0
+                                for i = 0 .. reading.work.length-1 do {
+                                    if reading.work[i] > max then {
+                                        max := reading.work[i]
+                                    }
+                                }
+                               // printInt(max)
+                              
+                              //  printString("\nSlave: create reply packet\n")
+                                //construct a packet with the answer
+                                reply = createReplyPacket(getNodeAddress(),reading.id, reading.workNum, max)
+                                //payload = new replyPacket(getNodeAddress(), reading.workNum,  max)
+                                //pac = new RadioPacket(reading.id , any(payload))
+
+                               // printString("Slave: send reply\n")
+                                //send the reply
+                                send reply on ucast
+                        }
+
+                        receive req from reqChan : {
+
+                           // printString("Slave: Got new request from ")
+                           // printUnsignedInt(req.id)
+                           // printString("\n")
+
+                           // printString("Slave: send ack\n")
+                            //ack the request if we pass some threshold!
+
+                            ack = createAckPacket(getNodeAddress(), req.id ,true )
+                           //  a := new ackPacket(getNodeAddress(), true)
+                           // ack := new RadioPacket(req.id , any(a))
+                            send ack on ucast
+
+                        }
+                }
+	}
+}
+/*------------------------------------------------------------------*/
+type demuxI is interface (in RadioPacket ether ;
+                          out replyPacket leaderReplyChan ;
+                          out ackPacket   leaderAckChan ;
+                          out workPacket  slaveWorkChan ;
+                          out requestPacket slaveReqChan )
+                                  
+component demux presents demuxI {
+    
+    constructor() {
+        
+    }
+    
+    behaviour {
+       
+        receive packet from ether
+       
+        project packet.payload as reading onto
+              replyPacket : {
+                //    printString("Demux : reply\n")
+                   send reading on leaderReplyChan
+              }
+              ackPacket : {
+               //   printString("Demux : ack\n")
+                   send reading on leaderAckChan
+              }
+              workPacket : {
+              //    printString("Demux : work\n")
+                  send reading on slaveWorkChan
+              }
+              requestPacket : {
+               //   printString("Demux : request\n")
+                  send reading on slaveReqChan
+              }
+              default : { printString("Demux: Unknown Packet\n")}
+    }
+}
+/*------------------------------------------------------------------*/
+//interface for leader
+type leaderI is interface(out any bcast; 
+                          out RadioPacket ucast ;
+                          out bool dataRequest ;
+                          in integer dataReply ;
+                          in integer button ;
+                          in ackPacket ackChan ;
+                          in replyPacket replyChan ;
+                          in bool timerChan )
+
+component leader presents leaderI{
+
+    dataNum  = 0
+    num = $0            
+	//The data array
+	data = new integer[10] of 0
+	init = true
+
+	constructor(){
+	}
+
+	behaviour{
+        
+        	if init then {
+            	receive press from button
+            	init := false
+            }
+          //  printString("Leader : begin\n")
+
+            req = new requestPacket(getNodeAddress())
+                    //createRequestPacket(getNodeAddress())
+            send any(req) on bcast
+
+            setTimer(timerChan, 20.0, false)
+
+            select {
+            		receive ack from ackChan : {
+                            unsetTimer(timerChan)
+                        //    printString("Leader: Got ack packet from ")
+                       //     printUnsignedInt(ack.id)
+                         //   printString("\n")
+
+                            //Firstly "collect sensor data"
+                         //   printString("Leader : Collect data ....")
+                            for i = 0 .. data.length - 1 do {
+                                    send true on dataRequest
+                        //            printString(" req ")
+                                    receive light from dataReply
+                                    //printString(" ans \n");
+                                    data[i] := light
+                            }
+                        //    printString("collected\n")
+
+
+                        //    printString("Leader: send requests ...")
+                            
+                            work = createWorkPacket(ack.id, getNodeAddress(), num , data)
+                            //payload = new workPacket(getNodeAddress(), num,  data)
+                            //pac = new RadioPacket(ack.id, any(payload))
+                            num := num + $1
+                            send work on ucast
+                        //    printString("sent\n")
+
+                  //          printString("Leader: wait for response\n")
+                            //wait for response and collate/analyse
+                            // for i = 0 .. dataNum do {
+                            setTimer(timerChan, 10.0, false)
+                            select {
+                                receive reply from replyChan :{
+                                   unsetTimer(timerChan)
+                        //           printString("Work Packet Number :")
+                       //            printUnsignedInt(reply.workNum)
+                        //           printString("\nAnswer : ")
+                       //            printInt(reply.answer)
+                        //           printString("\n")
+								}
+                                receive tick from timerChan : {printString("Timeout\n")}
+                           }
+            }
+            receive tick from timerChan : {printString("Timeout\n")}
+	}
+    }
+}
+/*****************************************************************************/
+l = new leader()
+
+connect l.button 		to buttonSensor.output
+connect l.bcast 		to radio.broadcastSend
+connect l.ucast 		to radio.unicastSend
+
+connect l.dataRequest 	to sensors.tempRequest
+connect l.dataReply 	to sensors.tempOut
+
+/*---------------------------------------------------------------------------*/
+s = new gridNode()
+	
+connect s.ucast to radio.unicastSend
+/*---------------------------------------------------------------------------*/
+d = new demux()
+
+connect d.ether             to radio.received
+connect d.leaderReplyChan   to l.replyChan
+connect d.leaderAckChan     to l.ackChan
+connect d.slaveWorkChan     to s.workChan
+connect d.slaveReqChan     to s.reqChan

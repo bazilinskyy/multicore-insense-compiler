@@ -1,0 +1,46 @@
+// Example 37 - code generation target 1
+// 23/1/07
+// Alan Dearle
+
+type rcv is interface( in integer input; out any counter )
+
+component Receiver presents rcv {
+
+	count = 0
+	
+	constructor() {
+	}
+	
+	
+	behaviour {
+		receive anint from input
+		send ( any( count ) ) on counter	//<<<<<<<<<<<<<<<<<<<<< check out this!
+		count := count + 1
+	}
+}
+
+type outt is interface( out integer output )
+
+component Sender presents outt {
+
+	someint = 345
+	
+	constructor() {
+	}
+	
+	behaviour {
+		send someint on output
+		someint := someint + 5 
+	}
+} 
+
+s = new Sender()
+r = new Receiver()
+
+connect s.output to r.input
+connect r.counter to standardOut
+
+
+
+
+

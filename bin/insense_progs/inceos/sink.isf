@@ -1,0 +1,115 @@
+type ReadingsPacket is struct (
+        integer ttl ;
+        address moteID ;
+        integer temp ;
+        integer humid ;
+        integer photo ;
+        integer solar
+)
+
+type NodePacket is struct (
+        address nodeAddress ;
+        integer distance ;
+        bool hasPath
+)
+
+type DiscoverPacket is struct (
+        unsigned origin 
+)
+
+type IReceiver is interface (
+	in RadioPacket radioChan ;
+	out ReadingsPacket printerChan ;
+	out RadioPacket radioOut
+)
+
+component Reciever presents IReceiver {
+	proc sendReply(address origin) {	
+		np = new NodePacket(getNodeAddress(), 0, true)
+		rp = new RadioPacket(origin, any(np))
+		send rp on radioOut
+		printString("Sent discover reply to: ")
+		printUnsignedInt(origin)
+		printString("\n")
+	}
+
+	constructor(){}
+
+	behaviour {
+		
+		//get something from the radio
+
+		receive rawpacket from radioChan
+
+		project rawpacket.payload as realpacket onto
+			ReadingsPacket	: { 
+				// send the mote address to the printer
+				send realpacket on printerChan
+			}
+			DiscoverPacket	: { 
+				printString("Discover from: ")
+				printUnsignedInt(rawpacket.addr)
+				printString("\n")
+				sendReply(realpacket.origin)	
+			}
+			default		: { 
+				printString(" - sent garbage!") // if we've got rubbish, ignore it and print this
+			}
+
+	}
+}
+
+type IPrinter is interface (
+	in ReadingsPacket input 
+)
+
+component Printer presents IPrinter {
+	constructor(){}
+
+	behaviour {
+
+		receive reading from input // get sensor reading
+
+		// print stuff to meet protocol
+		printString("DUMP ") 
+		printUnsignedInt(reading.moteID)
+		printString(" ")
+		printInt(1)
+		printString(" ")
+		printInt(reading.solar)
+		printString(" 0\n")
+
+		printString("DUMP ")
+		printUnsignedInt(reading.moteID)
+		printString(" ")
+		printInt(2)
+		printString(" ")
+		printInt(reading.photo)
+		printString(" 0\n")
+
+		printString("DUMP ")
+		printUnsignedInt(reading.moteID)
+		printString(" ")
+		printInt(3)
+		printString(" ")
+		printInt(reading.temp)
+		printString(" 0\n")
+
+		printString("DUMP ")
+		printUnsignedInt(reading.moteID)
+		printString(" ")
+		printInt(4)
+		printString(" ")
+		printInt(reading.humid)
+		printString(" 0\n")
+			
+	}
+}
+
+rcvr = new Reciever()
+pr = new Printer()
+
+// hook everything up
+connect rcvr.radioChan to radio.received
+connect rcvr.printerChan to pr.input
+connect rcvr.radioOut to radio.unicastSend

@@ -1,0 +1,74 @@
+// Simple example of 3 senders and a single selector printing out
+// the received values to standard output that has type interface ( in any input )
+
+
+type ISelector is interface( in integer ticker, tocker, tacker ; out any stdOutChan )
+type ITucker is interface ( out integer output )
+
+component Selector presents ISelector {
+	
+	a = 10
+	
+	constructor() {
+	}
+	
+	behaviour {
+		select {
+		    receive x from ticker when a > 7 : { a := x }
+		    receive y from tocker : { a := y }
+		    receive z from tacker when a < 7 : {a := z } 
+		    default: { a := 1 }
+		}
+	}
+}
+
+component Ticker presents ITucker {
+
+	value = 0
+		
+	constructor() {	
+	}
+	
+	behaviour {
+		send value on output
+		value := value + 1
+	}
+} 
+
+component Tocker presents ITucker {
+
+	value = -100
+		
+	constructor() {	
+	}
+	
+	behaviour {
+		send value on output
+		value := value + 1
+	}
+} 
+
+component Tacker presents ITucker {
+
+	value = 100
+		
+	constructor() {	
+	}
+	
+	behaviour {
+		send value on output
+		value := value + 1
+	}
+} 
+
+
+
+sel = new Selector()
+tic = new Ticker()
+toc = new Tocker()
+tac = new Tacker()
+
+connect tic.output to sel.ticker
+connect toc.output to sel.tocker
+connect tac.output to sel.tacker
+connect sel.stdOutChan to standardOut

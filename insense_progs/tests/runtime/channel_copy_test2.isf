@@ -1,0 +1,53 @@
+// Simple Insense program to send a channel over a channel
+// tests the copy function for channels that is supposed to 
+// create a copy with the same connectivity as the original channel
+
+// type of channel to send over a channel is 'out any'
+type channelType is out any
+
+// Interface for channel receiver component
+type IChannelReceiver is interface ( in channelType input )
+
+// Channel receiver component
+component ChannelReceiver presents IChannelReceiver {
+
+	msg = ""
+	firstRun = true
+
+	constructor(string message) {
+		msg := message
+	}
+		
+	behaviour {
+		receive channel from input
+		send any(msg) on channel
+	}
+} 
+
+// Interface for channel sender
+//type IChannelSender is interface ( out channelType output1, output2 )
+type IChannelSender is interface ( out channelType output1 ; out channelType output2 )
+
+// Channel sender component
+component ChannelSender presents IChannelSender {
+
+	constructor() {
+	}
+		
+	behaviour {
+		channelToSend = new out any
+		connect channelToSend to standardOut
+		send channelToSend on output1
+		send channelToSend on output2
+	}
+} 
+
+
+
+channelReceiver1 = new ChannelReceiver("\nHello")
+channelReceiver2 = new ChannelReceiver("\nGood Bye")
+channelSender = new ChannelSender()
+
+connect channelSender.output1 to channelReceiver1.input
+connect channelSender.output2 to channelReceiver2.input
+

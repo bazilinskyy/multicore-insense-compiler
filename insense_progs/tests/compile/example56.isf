@@ -1,0 +1,33 @@
+// array assignment
+
+type foo is interface( in integer input; out string trace )
+
+type bar is struct( integer a; integer[][] b );
+
+component Receiver presents foo  {
+
+	s = new integer[4][3] of 3
+	
+	p = new bar( 3,s )
+	
+	constructor() {
+	}
+	
+	behaviour {
+		a = 7;
+		try {
+			a := p.b[2][3]
+		}
+		except {
+			a := 2
+		}
+	}
+}
+
+
+
+
+
+
+
+

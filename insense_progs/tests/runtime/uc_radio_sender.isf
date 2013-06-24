@@ -1,0 +1,71 @@
+
+type Reading is struct(integer cycle ; integer solar ; real temp)
+
+
+
+// Interface for Unicast (UC) radio sender component
+type IUcSender is interface (out RadioPacket radioChan )
+
+// Unicast (UC) radio sender component
+component UcSender presents IUcSender, ISchedulable{
+
+	cycle = 0
+	dutyCycle = 0
+	nodeAddr = new byte[2] of #0
+	destAddr = new byte[2] of #0
+
+	proc printAddress(byte[] addr){
+		printAny(any(addr[0]))
+		printAny(any("."))
+		printAny(any(addr[1]))		
+	}
+	
+	proc printOutput(Reading data){
+		printAny(any("\nSent " ))
+		printAny(any("reading = ( cycle="))
+		printAny(any(data.cycle))
+		printAny(any(", solar="))
+		printAny(any(data.solar))
+		printAny(any(", temp="))
+		printAny(any(data.temp))
+		printAny(any(" ) from "))
+		printAddress(nodeAddr)
+		printAny(any(" to "))
+		printAddress(destAddr)		
+	}
+	
+	constructor(integer dutyCycle) {
+		// setup ticker for given duty cycle
+		periodicEnSchedule( inTicksChan, dutyCycle )
+		// this node's address
+		nodeAddr[0] := #2
+		// set this node's address
+		setRadioNodeAddress(nodeAddr)
+		// get node address back from radio to test that set worked 
+		nodeAddr := getRadioNodeAddress()
+		// sink node's address
+		destAddr[0] := #1
+	}
+		
+	behaviour {
+		// wait for tick from timer
+		receive tick from inTicksChan
+
+		// get readings and build data packet
+		reading = new Reading(cycle, getSolarSensorReading(), getTemperatureSensorReading())
+		payload = (any(reading))
+		packet = new RadioPacket(destAddr, payload)
+		
+		// send packet
+		send packet on radioChan
+
+		// print out trace info		
+		printOutput(reading)
+		cycle := cycle + 1
+	}
+} 
+
+// create component instance that measures and sends data every 10 seconds
+rs = new UcSender(10) 
+
+connect rs.radioChan to radioOut.unicast

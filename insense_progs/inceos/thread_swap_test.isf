@@ -1,0 +1,24 @@
+/**
+ * thread_swap_test.isf
+ *
+ * Simple test for the scheduler with multiple components.
+ *
+ *
+*/
+
+
+type Isend is interface(out bool output)
+
+component snd presents Isend {
+	constructor(){}
+	
+	behaviour {
+		
+	}
+}
+
+
+
+a = new snd()
+
+b = new snd()

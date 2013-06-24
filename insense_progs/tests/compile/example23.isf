@@ -1,0 +1,19 @@
+// Tests assignment
+
+type foo is interface( out integer null )
+component Assign presents foo {
+	
+	x = 0;
+	
+	constructor() {
+	}
+	
+	behaviour {
+			x := 3;
+		}
+	}
+}
+
+
+
+

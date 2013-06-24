@@ -1,0 +1,44 @@
+	
+type Isender is interface( out string output )
+type Ireceiver is interface ( in string input )
+	
+component sender presents Isender {
+
+	mesg = ""
+
+	
+		
+	proc id(string s) : string {
+		return s
+	}
+	
+	constructor(){
+	}
+	
+	constructor(string s) {
+		mesg := s
+	}
+
+	behaviour {
+		m = id(mesg)
+		send m on output
+	}
+}
+
+
+component receiver presents Ireceiver {
+
+	constructor() {
+	}
+	
+	behaviour {
+		receive text from input
+		printAny(any(text))
+	}
+}
+
+// Insense main
+
+s = new sender("InceOS is running with function id\n")
+r1 = new receiver()
+connect s.output to r1.input

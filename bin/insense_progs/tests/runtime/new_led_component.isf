@@ -1,0 +1,32 @@
+// Insense representation of basic LED component
+// functions to write to 
+ 
+
+
+component LEDs presents ILEDs {
+
+	ledState = RedOffGreenOffBlueOff
+
+	constructor() {	
+	}
+		
+	behaviour {
+		select {
+			receive state from setState : { 
+				ledState := state 
+			}
+			receive red from redState : { 
+				if (red == true) { ledState := RedOnGreenOffBlueOff }
+				else { ledState := RedOffGreenOffBlueOff }
+			} 
+			receive green from greenState : {
+				if (green == true) { ledState := RedOffGreenOnBlueOff }
+				else { ledState := RedOffGreenOffBlueOff }
+			}
+			receive blue from blueState : {
+				if (blue == true) { ledState := RedOffGreenOffBlueOn }
+				else { ledState := RedOffGreenOffBlueOff }
+			}
+		}
+	}
+}

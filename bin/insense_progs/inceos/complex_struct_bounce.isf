@@ -1,0 +1,84 @@
+
+
+type record is struct(unsigned id ; integer[] buf)
+type bufferGroup is struct(unsigned todo; integer[] a ; integer[] b ;integer[] c ;integer[] d)
+
+
+type Ialpha is interface(out record output ; in record input)
+type Ibeta is interface(out record output ; in record input ;  in bool in1 ; in integer[] in2 ; out integer[] out2)
+
+ proc createArray () : integer[] {
+ 
+		a = new integer[25] of 0
+		return a
+}
+/*-------------------------------------------------------------------------*/
+ proc createRecord (unsigned id ; integer[] buf) : record {
+ 
+		sr = new record(id, buf)
+		return sr
+}
+/*-------------------------------------------------------------------------*/
+component a presents Ialpha{
+
+	empty = new integer[1] of 0
+	b = new bufferGroup($0,empty, empty, empty, empty)
+	bufs = new bufferGroup[5] of b
+
+	constructor() {
+		for i = 0 .. 4 do {
+			bufs[i].todo := $0
+			bufs[i].a := createArray()//= new integer[25] of 0 //:= buffers[0 + (4*i)]
+			bufs[i].b := createArray() //buffers[1 + (4*i)]
+			bufs[i].c := createArray()//buffers[2 + (4*i)]
+			bufs[i].d := createArray()//buffers[3 + (4*i)]
+		}
+	}
+	
+	behaviour {
+	tmp = createRecord($0, bufs[0].a)
+	send tmp on output
+	
+	receive b from input
+	bufs[0].a := b.buf
+	
+	}
+}
+
+
+component b presents Ibeta{
+	empty = new integer[1] of 0
+	a = new bufferGroup($0,empty, empty, empty, empty)
+	bufs = new bufferGroup[5] of a
+	r = new record($0, empty)
+	
+	boolean = false
+	constructor() {}
+	behaviour {
+	select {
+		receive b from input : {
+			if(boolean)then
+				r := b
+				
+			
+		}
+		receive b from in2 : {
+			empty := b
+			send b on out2
+			send empty on out2
+			//send r on output
+		}
+		receive b from in1 :{}
+	}
+	
+	
+		
+	
+	}
+}
+
+alpha = new a()
+beta = new b()
+
+connect alpha.output to beta.input
+connect alpha.input to beta.output

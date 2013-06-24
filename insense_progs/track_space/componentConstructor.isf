@@ -1,0 +1,18 @@
+	
+type Icomp is interface( out string output )
+	
+component comp presents Icomp {
+	
+	a = 0
+	
+	constructor(integer i){
+		a := i;
+	}
+	
+	behaviour {
+	}
+}
+
+// Insense main
+
+s = new comp(3)

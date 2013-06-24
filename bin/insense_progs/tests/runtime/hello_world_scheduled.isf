@@ -1,0 +1,36 @@
+// Simple example showing how to schedule applications
+
+// App only needs to present ISchedulable in order to be scheduled
+// ISchedulable declares a channel 'in bool inTicksChan'
+
+component App presents ISchedulable {
+		
+	dutyCycle = 0.0
+	value = 0.0
+	
+	constructor(real inDutyCycle){
+		dutyCycle := inDutyCycle
+		periodicEnSchedule( inTicksChan, dutyCycle )
+		
+	}
+	
+	behaviour {
+		receive tick from inTicksChan
+		value := value + dutyCycle
+		setBlueLedPower(true)
+		printAny(any("App "))
+		printAny(any(dutyCycle))
+		printAny(any(": "))
+		printAny(any(value))
+		printAny(any("\n"))
+		setBlueLedPower(false)
+	}
+}
+
+app1 = new App(4.0)
+app2 = new App(13.0)
+//app3 = new App(0.5)
+
+
+
+

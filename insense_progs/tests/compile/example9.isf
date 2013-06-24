@@ -1,0 +1,31 @@
+// Tests component creation
+
+type foo is interface( in integer ticker,tocker; out integer bob )
+
+component Radio presents foo {
+	
+        
+	size = 0;
+	
+	constructor() {
+	}
+	
+	constructor( in integer startticks ) {
+		ticker := startticks;
+	}
+	
+	constructor( in integer startticks; integer framesize ) { 
+		ticker := startticks;
+	}	
+	
+	behaviour {
+		
+	}
+}
+ 
+bob = new Radio();
+
+
+
+
+

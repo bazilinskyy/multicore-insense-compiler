@@ -1,0 +1,81 @@
+// Simple example showing how to use testing syntax "throw OperationFailedException" in procedures
+
+type IEmpty is interface ( )
+
+
+//component Test1 presents IEmpty {
+//
+//	constructor(){}
+//	
+//	behaviour {
+//		
+//		try{
+//			whole = 5.0
+//			numerator = 2.0
+//			denominator = 0.0
+//			printString("\n1: value = ")
+//			if denominator == 0.0 then
+//				throw DivisionByZeroException
+//			value = whole + numerator / denominator
+//			printReal(value)
+//		} except DivisionByZeroException {
+//			printString(" --- failed ---")
+//		}
+//		printString("\n")
+//	}
+//
+//}
+
+
+component Test2 presents IEmpty {
+	
+	proc divide(real numerator, denominator) : real {
+		if denominator == 0.0 then
+			throw DivisionByZeroException
+		return numerator/denominator
+	}
+	
+	proc add(real a, b) : real {
+		if a < 0 or b < 0 then 
+			throw OperationFailedException
+		return a + b
+	}
+	
+	proc rationalToDecimal(real whole, numerator, denominator) : real {
+		return add(whole, divide(numerator, denominator))
+	}
+	
+	proc printRational(real whole, numerator, denominator){
+		try{
+			printString("\n2: value = ")
+			value = rationalToDecimal(whole, numerator, denominator)
+			printReal(value)
+		} except DivisionByZeroException {
+			printString(" --- printRational: div by 0 ---")
+		} 
+		printString("\n")
+	}
+	
+	constructor(){}
+	
+	behaviour {
+		
+		try {
+			printRational(2.0, 3.0, 4.0) // 2 and 3/4
+			printRational(2.0, 3.0, 0.0) // 2 and 3/0
+			printRational(-1.0, -3.0, 7.0) // -1 and 3/7
+			printString(" --- behav: success ---")
+		} except OperationFailedException {
+			printString(" --- behav: op failed  ---")
+		}
+		printString("\n")
+	}
+}
+
+
+
+//test1 = new Test1()
+test2 = new Test2()
+
+
+

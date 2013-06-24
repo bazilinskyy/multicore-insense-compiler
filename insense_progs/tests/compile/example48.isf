@@ -1,0 +1,21 @@
+// Tests that clause blocks have the right types
+
+type inyerface is interface( out string output )
+
+component MyComp presents inyerface {
+	
+	constructor() {
+	}
+	
+	
+	behaviour {
+		a = {8}
+		b = a + 4;
+	}
+}
+
+
+
+
+
+

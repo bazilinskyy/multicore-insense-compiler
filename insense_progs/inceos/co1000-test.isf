@@ -1,0 +1,53 @@
+/*
+ * Test program for the co1000 sensor board
+ */ 
+type Ico1000 is interface( 	out bool pReq  ; in integer pVal	;
+							out bool txReq ; in integer txVal	;
+							out bool tyReq ; in integer tyVal	;
+							out bool axReq ; in integer axVal 	;
+							out bool ayReq ; in integer ayVal 	)
+	
+component co1000 presents Ico1000 {
+
+	constructor(){
+	}
+	
+	behaviour {
+		
+		//presure
+		send true on pReq
+		receive p from pVal
+		
+		//Tilt X
+		send true on txReq
+		receive tx from txVal
+		
+		//Tilt Y
+		send true on tyReq
+		receive ty from tyVal
+		
+		//Accel X
+		send true on axReq
+		receive ax from axVal
+		
+		//Accel Y
+		send true on ayReq
+		receive ay from ayVal
+	}
+}
+
+// Insense main
+
+c = new co1000()
+
+connect c.pReq  to sensors.pressureRequest
+connect c.txReq to sensors.tiltXRequest
+connect c.tyReq to sensors.tiltYRequest
+connect c.axReq to sensors.accelXRequest
+connect c.ayReq to sensors.accelYRequest
+
+connect c.pVal  to sensors.pressureOut
+connect c.txVal to sensors.tiltXOut
+connect c.tyVal to sensors.tiltYOut
+connect c.axVal to sensors.accelXOut
+connect c.ayVal to sensors.accelYOut

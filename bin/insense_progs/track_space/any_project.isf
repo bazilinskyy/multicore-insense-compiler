@@ -1,0 +1,37 @@
+
+type Reading is struct ( integer time ; real temp )
+
+type IComponent is interface ( in any input ) 
+
+component Comp presents IComponent {
+
+	constructor() { }
+	
+	behaviour {
+		receive a from input
+		i = 0
+		r = 0.0
+		r2 = 3.0
+		project a as value onto 
+			integer : { 
+				r1 = 0.0 
+				i := value + 1 
+				r2 = 0.0  
+			}  
+		   	real    : {
+				r := value + 1.0 
+			}
+			Reading : { 
+				r := value.temp 
+				reading = value
+				r2 = reading.temp
+			}
+		   	default : {
+		   		str = "hello"
+		   		printAny(any(str))
+		   		i = 0
+		   	}
+	}
+	
+}
+

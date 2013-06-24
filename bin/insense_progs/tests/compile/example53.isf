@@ -1,0 +1,25 @@
+// array assignment
+
+type foo is interface( in integer input; out string trace )
+
+component Receiver presents foo  {
+
+	s = new integer[4] of 3
+	a  = 7
+	
+	constructor() {
+	}
+	
+	behaviour {
+		a := 8
+		s[10] := 3
+	}
+}
+
+
+
+
+
+
+
+

@@ -1,0 +1,17 @@
+// Tests stop
+type a is interface(out integer null)
+
+component StopStart presents a {
+	
+	constructor() {
+	}
+	
+	behaviour {
+		stop;
+		
+	}
+}
+
+
+
+

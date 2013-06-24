@@ -1,0 +1,62 @@
+/**
+ * Test broadcast
+ * 
+ * This is testing the simple broadcasting mechanism of the language. Here one 
+ * component periodically sends a message and another receives it.
+ * 
+ */
+
+
+
+
+
+type sendI is interface (in bool timer ;out any ether)
+
+component sender presents sendI {
+    constructor() {
+        setTimer(timer , 1.0 , true)
+    }
+
+    behaviour {
+        receive tick from timer
+
+        setRedLedPower(true)
+	//	printString("Red : ON\n")
+        send any(true) on ether
+
+        setRedLedPower(false)
+    //    printString("Red : OFF\n")
+    }
+}
+/*----------------------------------------------------------------------------*/
+type recvI is interface(in RadioPacket ether)
+
+component recver presents recvI {
+    state = true
+
+    constructor() {
+
+    }
+
+    behaviour {
+
+        receive packet from ether
+
+        project packet.payload as reading onto
+                bool : {
+                //	printString("Blue :\n")
+                    setBlueLedPower(state)
+                    state := !state
+                }
+                default : {}
+    }
+}
+
+/*****************************************************************************/
+
+s = new sender()
+r = new recver()
+
+connect s.ether to radio.broadcastSend
+
+connect r.ether to radio.received

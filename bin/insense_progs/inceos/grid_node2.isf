@@ -1,0 +1,232 @@
+/*
+* This will gather some sort of grid stuff
+*/
+
+//struct to distribut workloads
+type workPacket is struct (unsigned id ; unsigned workNum ; integer[] work)
+
+type replyPacket is struct ( unsigned id ; unsigned workNum ; integer answer )
+
+type ackPacket is struct (unsigned id ; bool state)
+
+//interface for the grid node component
+type gridNodeI is interface (out RadioPacket ucast ; in RadioPacket ether)
+
+//interface for leader
+type leaderI is interface(out any bcast; out RadioPacket ucast ; in RadioPacket ether ; out bool dataRequest ; in integer dataReply)
+
+//interface for master
+type masterI is interface(in integer button ; in RadioPacket ether ) 
+
+//enum for the type of component to create
+type compType is enum (mstr, slave, other)
+/*------------------------------------------------------------------*/
+proc createReplyPacket (unsigned id ; unsigned dest ; unsigned workNum ; integer ans) : RadioPacket {
+
+		r = new replyPacket(id, workNum,  ans)
+		p = new RadioPacket(dest , any(r))
+		return p
+}
+/*------------------------------------------------------------------*/
+proc createWorkPacket (unsigned id ; unsigned workNum ; integer[] work) : workPacket {
+
+		r = new workPacket(id, workNum,  work)
+		return r
+}
+/*------------------------------------------------------------------*/
+proc createAckPacket (unsigned id ; unsigned dest ;bool state ) : RadioPacket {
+
+		r = new ackPacket(id, state)
+		p = new RadioPacket(dest , any(r))
+		return p
+}
+/*------------------------------------------------------------------*/
+
+component gridNode presents gridNodeI {
+
+
+	data = any(1)
+		
+	constructor() {
+	}
+	
+	constructor(RadioPacket packet){
+		printString("Create Slave\n")
+		data := packet.payload
+	}
+	
+	behaviour {
+
+			printString("Slave running ....\n")
+            project data as reading onto
+                  workPacket : {
+
+						printString("reading.work")
+						//ack the request
+						ack = createAckPacket(getNodeAddress(), reading.id , true)
+						send ack on ucast
+						
+                        //process the data
+                        //ans = ifft(reading.work, reading.work.length)
+
+                        //construct a packet with the answer
+                        reply = createReplyPacket(getNodeAddress(),reading.id, reading.workNum, 6)
+
+                        //send the reply
+                        send reply on ucast                         
+                  }
+                  default : {printString("Slave : bad data\n")}
+
+                  stop
+	}
+}
+/*------------------------------------------------------------------*/
+component leader presents leaderI{
+
+    dataNum  = 5
+                
+	//The data array
+	data = new integer[50] of 0
+   work = createWorkPacket(getNodeAddress(), $1 , data)
+	flag = false
+
+	constructor(bool i){
+		printString("Create Leader\n")
+		
+		flag := i
+	}
+
+
+
+	behaviour{
+	
+		if flag then 
+			stop
+	
+		
+		//Firstly "collect sensor data"
+		printString("Leader : Collect data ....")
+                for j = 0 .. dataNum do {
+
+                    
+                    for i = 0 .. data.length-1 do {
+                            send true on dataRequest
+                            receive light from dataReply
+
+                            data[i] := light
+                    }
+                   
+
+
+                   // printString("Leader: send requests ...")
+                    work := createWorkPacket(getNodeAddress(), $1 , data)
+                    send any(work) on bcast
+                    printString("sent\n")
+
+                }
+                printString("collected\n")
+
+		
+		//Farm out the data
+    /*            dummy = new integer[100] of 0
+               
+                for i = 0 .. dataNum do {
+                	for j = 0 .. data.length-1 do {
+						dummy[j] := data[i]
+					}
+					 work = createWorkPacket(getNodeAddress(), $1 , dummy)
+                     send any(work) on bcast
+                }
+*/
+
+		printString("Leader: wait for response\n")
+		//wait for response and collate/analyse
+                for i = 0 .. dataNum do {
+                    receive packet from ether
+
+                     project packet.payload as reading onto
+                          replyPacket : {
+                               printString("Work Packet Number :")
+                               printUnsignedInt(reading.workNum)
+                               printString("\nAnswer : ")
+                               printInt(reading.answer)
+                               printString("\n")
+                          }
+                          default : { i := i -1}
+
+                }
+
+                stop
+	}
+}
+/*------------------------------------------------------------------*/
+
+
+/*------------------------------------------------------------------*/
+component master presents masterI {
+
+	init = true
+	choice = other
+	
+	l = new leader(true)
+	//s = new gridNode()
+                
+    proc createLeader () {
+    
+    	stop l
+    	
+	    comp1 = new leader(false)
+	    connect comp1.bcast to radio.broadcastSend
+	    connect comp1.ucast to radio.unicastSend
+	    connect comp1.ether to radio.received
+	            
+	    connect comp1.dataRequest to sensors.tempRequest
+	    connect comp1.dataReply to sensors.tempOut
+	    l := comp1
+	}
+
+	/*proc createSlave (RadioPacket p) {
+		
+		stop s
+	    comp = new gridNode(p)
+	
+	    connect comp.ucast to radio.unicastSend
+	    connect comp.ether to radio.received
+	    
+	    s:= comp
+	}   */             
+	constructor(){
+	
+	}
+	
+	behaviour {
+
+		if init then {
+		//	stop s
+			stop l
+			init := false
+		}
+		
+		//if button is pressed -> leader, else node
+		select {
+		    receive x from button : {
+		    			printString("Master: create leader\n")
+                        createLeader()
+                    }
+		 /*   receive y from ether  : {
+		 				printString("Master: create slave\n")
+                        createSlave(y)
+                    }
+                    */
+			}
+        }
+}
+
+/*------------------------------------------------------------------*/
+
+/*****************************************************************************/
+
+m = new master()
+
+connect m.button to buttonSensor.output
+connect m.ether to radio.received

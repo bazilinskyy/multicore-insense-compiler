@@ -1,0 +1,19 @@
+
+fooAddr = new byte[2] of #1
+barAddr = new byte[2] of #2
+
+fooChan = new out real
+barChan = new in real
+
+connect fooChan to barChan
+connect barChan to fooChan
+
+connect fooChan to "bar" on barAddr
+connect "bar" on barAddr to fooChan 
+
+connect barChan to "foo" on fooAddr
+connect "foo" on fooAddr to barChan 
+
+connect "foo" on fooAddr to "bar" on barAddr
+connect "bar" on barAddr to "foo" on fooAddr 
+

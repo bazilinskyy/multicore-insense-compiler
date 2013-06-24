@@ -1,0 +1,36 @@
+
+//type ConnectionChange is struct (
+//	integer issuer ;
+//	integer changeType ;
+//	integer connection
+//)
+
+// Interface for Dummy component to force generation of serialisation code
+type IDummy is interface ( )
+
+component Dummy presents IDummy {
+
+	constructor() { }
+		
+	behaviour {
+		dummyPubChan = new PublicChannel("Test", Out)
+		pubChans = new PublicChannel[3] of dummyPubChan
+		anyPubChans = any(pubChans)
+//		addr = new byte[2] of #0
+//		con = new Connection(addr, "", addr, "")
+//		anyCon = any(con)
+//		ccon = new ConnectionChange(0, 0, 0)
+//		anyCCon = any(ccon)
+		
+		project anyPubChans as value onto
+//			Connection : { }
+//			ConnectionChange : { }
+		    PublicChannel : { }
+			PublicChannel[] : { }
+			default : { }
+	}
+} 
+
+// create dummy component instance
+rs = new Dummy() 
+

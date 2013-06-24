@@ -1,0 +1,47 @@
+
+type Struct is struct (integer i ; real r)
+
+type ISender is interface( out Struct output )
+type IReceiver is interface ( in Struct input )
+	
+component Sender presents ISender {
+
+	i = 0
+	r = 0.0
+	
+	constructor(){
+	}
+	
+	behaviour {
+		s = new Struct(i,r)
+		send s on output
+		i := i + 1
+		r := r + 1.0
+	}
+}
+
+
+component Receiver presents IReceiver {
+
+	proc printStruct(Struct s){
+		printString("struct ( ")
+		printInt(s.i)
+		printString(" , ")
+		printReal(s.r)
+		printString(" )\n")		
+	}
+	
+	constructor() {
+	}
+	
+	behaviour {
+		receive s from input
+		printStruct(s)
+	}
+}
+
+// Insense main
+
+s = new Sender()
+r = new Receiver()
+connect s.output to r.input

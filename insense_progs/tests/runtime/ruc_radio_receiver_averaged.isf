@@ -1,0 +1,70 @@
+/* 
+ * ruc_radio_receiver_averaged.isf
+ * 
+ * Insense program to gather arrays of light, temp, and humidity readings sent by sender nodes and
+ * to print out the results in CSV format.
+ * 
+ * @author jonl
+ * 
+ */
+
+// type for sensor readings
+type Reading is struct(integer cycle ; integer solar ; real temp ; real humid)
+
+// procedure to print out an array of readings
+proc printData(byte[] addr ; Reading[] data ; out any chan){
+	seperator = (any(", "))
+	for i = 0 .. data.length-1 do {
+		reading = data[i]
+		send (any("\n")) on chan
+		send (any(addr[0])) on chan
+		send (any(".")) on chan
+		send (any(addr[1])) on chan
+		send seperator on chan
+		send (any(reading.cycle)) on chan
+		send seperator on chan
+		send (any(reading.solar)) on chan
+		send seperator on chan
+		send (any(reading.temp)) on chan
+		send seperator on chan
+		send (any(reading.humid)) on chan
+	}
+}
+
+// Interface for Test
+type IRucReceiver is interface (in RadioPacket radioChan ; out byte[] radioSetNodeAddress ; out any trace)
+
+// (Semi)-Reliable UniCast (RUC) radio receiver component
+component RucReceiver presents IRucReceiver {
+
+	
+	constructor() {	
+		// make connections
+		connect radioChan to radioIn.received
+		connect radioSetNodeAddress to radio.setNodeAddress
+		connect trace to standardOut
+		// byte array to hold this node's address
+		nodeAddr = new byte[2] of #0
+		// set byte array content
+		nodeAddr[0] := #1           
+		nodeAddr[1] := #0
+		// set receiver's rime address to nodeAddr
+		send nodeAddr on radioSetNodeAddress
+	    // print CSV header to stdout
+		send (any("\nnode, cycle, solar, temp, humid")) on trace
+	}
+		
+	behaviour {
+		receive packet from radioChan                                      // get packet from radio
+		project packet.payload as something onto                           // Try to match the payload with  
+			Reading[] : {                                                  // a Reading array 
+				readings = something                                       // in which case 
+				printData(packet.addr, readings, trace) // print out the ReadingArray
+			}
+			default : { }                                                  // if the payload type is unknown do nothing
+	}
+} 
+
+// instantiate the component
+rr = new RucReceiver()
+

@@ -1,0 +1,37 @@
+// Tests double try catch
+
+type foo is interface( in integer input; out string trace )
+
+component Receiver presents foo  {
+
+
+	constructor() {
+	}
+	
+	
+	behaviour {
+		somedata = 7;
+		try {
+			receive fish from input
+			try {
+				receive bish from input
+				send "OK" on trace
+			}
+			except {
+				somedata := 44
+			}
+		}
+		except {
+			somedata := 9
+		}
+	}
+	
+}
+
+
+
+
+
+
+
+

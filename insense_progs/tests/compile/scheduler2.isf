@@ -1,0 +1,70 @@
+type Request is struct( out bool notify; integer millisecs )
+type IScheduler is interface( in Request requests ) // was IClock
+
+								
+component Scheduler presents IScheduler {
+
+	realtimeclock =  new in bool // really secret function create_rtc( 1 ) // new out bool, every 1 ms
+	
+	// scheduler list = xxxx we cant express this
+	
+	proc addToScheduleList( Request request ) {
+		// add request to scheduler list
+	}
+	
+	proc doSomething() {
+		// looks in scheduler list to see if any sends are needed
+		// if they are it does them
+	}
+
+	behaviour {
+		select {
+			receive x from realtimeclock  : { doSomething() }
+			receive request from requests : { addToScheduleList( request ) }
+		}
+	}
+}
+
+component scheduleHelper presents myinterface {
+	inTicks = new in bool		// The channel on which we will wait to be scheduled
+	outTicks = new out bool
+	clockRequests = new out Request	// Channel on which we talk to the scheduler to request scheduling
+
+	proc constr( int tickfrequency ) {
+		xx = new Request( theTicks, tickfrequency  )
+			connect myScheduler to scheduleMe
+			scheduleRequest = xx
+			connect clockRequests to requestSchedule
+			send scheduleRequest on clockRequests
+	}
+			
+	constructor(  in Request requestSchedule ) {
+		constr( requestSchedule )
+	}
+	
+	behaviour() {
+		send inTicks on myinterface
+	}
+}
+
+type ISchedulable is interface( in bool myScheduler );
+
+component someComponent presents ISchedulable {
+			
+	constructor(  ) {
+	}
+	
+	behaviour {
+		receive tick from myScheduler
+		// do stuff
+	}
+}
+
+sched = new Scheduler()
+helper = new scheduleHelper( 10 )
+myapp = new someComponent()
+connect myapp.myScheduler to helper.xx
+
+
+
+

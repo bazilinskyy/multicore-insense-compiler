@@ -1,0 +1,78 @@
+/*
+ * Radio stress test
+ *
+ * one node sends with 3 components, the other receives
+ */
+
+
+
+//Used to specify the different led types
+type ledType is enum (red, green, blue, other)
+
+type stressI is interface( in integer button ; in RadioPacket ether ; out any bcast)
+
+component stress presents stressI {
+
+    buttonPressed = false
+    led = other
+    state = true
+
+    constructor(ledType l) {
+        led := l
+    }
+
+    behaviour {
+
+        
+        if !buttonPressed then {
+            select {
+
+                //wait for the button press to start
+                receive press from button when !buttonPressed: {
+                    buttonPressed := true
+                }
+
+                //we got packet ==> receiver
+                receive packet from ether when !buttonPressed: {
+                    project packet.payload as data onto
+                            ledType : {
+                                if (data == red) then{
+                                        setRedLedPower(state)
+                                }
+
+                                if (data == green) then{
+                                        setGreenLedPower(state)
+                                }
+
+                                if (data == blue) then{
+                                        setBlueLedPower(state)
+                                }
+                                
+                                state := !state
+                            }
+                            default : {}
+                }
+            }
+        }
+        else {
+            send any(led) on bcast
+        }
+    }
+}
+
+/*******************************************************************/
+r = new stress(red)
+b = new stress(blue)
+g = new stress(green)
+
+connect r.ether to radio.received
+connect r.bcast to radio.broadcastSend
+connect r.button to buttonSensor.output
+
+connect b.ether to radio.received
+connect b.bcast to radio.broadcastSend
+connect b.button to buttonSensor.output
+
+connect g.ether to radio.received
+connect g.bcast to radio.broadcastSend
+connect g.button to buttonSensor.output

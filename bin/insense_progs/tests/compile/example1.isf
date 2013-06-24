@@ -1,0 +1,26 @@
+// Tests general component structure
+
+type foo is interface( in integer ticks )
+
+component Radio presents foo {
+	
+	size = 0;
+	
+	constructor() {
+	}
+	
+	constructor( in integer startticks ) {
+		ticker = startticks;
+	}
+	
+	constructor( in integer startticks; integer framesize ) { 
+		ticker = startticks;
+	}	
+	
+	behaviour {
+		sze = 0
+	}
+}
+ 
+
+

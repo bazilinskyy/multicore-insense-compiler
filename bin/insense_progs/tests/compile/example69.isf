@@ -1,0 +1,19 @@
+type chanchan is interface( out out bool chan; out bool blueled )
+								
+component c1 presents chanchan {
+
+	x = new out bool
+	
+	constructor() {
+			connect x to leds.blueState 
+	}
+
+	behaviour {
+
+		send true on x
+		send x on chan
+	}
+}
+
+tr = new c1()
+connect tr.blueled to leds.blueState

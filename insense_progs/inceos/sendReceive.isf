@@ -1,0 +1,44 @@
+
+type ISender is interface( out integer output )
+type IReceiver is interface ( in integer input )
+
+proc printMessageAndNumber(string msg; integer number){
+	printString(msg)
+	printInt(number)
+	printString("\n")
+}
+
+
+component Sender presents ISender {
+
+	number = 0
+
+	constructor(){
+	}
+
+	behaviour {
+		printMessageAndNumber("S: sending value ", number)
+		send number on output
+		number := number + 1
+	}
+}
+
+
+component Receiver presents IReceiver {
+
+
+
+	constructor() {
+	}
+
+	behaviour {
+		receive number from input
+		printMessageAndNumber("R: got value ", number)
+	}
+}
+
+//Insense main
+
+s = new Sender()
+r = new Receiver()
+connect s.output to r.input

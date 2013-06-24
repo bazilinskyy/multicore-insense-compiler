@@ -1,0 +1,31 @@
+// Array multiple dimensional selection
+
+type foo is interface( in integer input; out string trace )
+
+component Receiver presents foo  {
+
+	one = new integer[3] of 3
+	three = new integer[4][4][5] of 3
+
+	a  = 7
+	
+	constructor() {
+	}
+	
+	behaviour {
+		a := one[2]
+		one[1] := 2
+		a := three[1][2][3]
+
+	}
+}
+
+//			*array_pointer_loc( x1,iter1,&success ) = x2;
+//		*array_pointer_loc( x0,iter2,&success ) = x1;
+
+
+
+
+
+
+

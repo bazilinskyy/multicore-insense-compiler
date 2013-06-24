@@ -1,0 +1,428 @@
+
+
+// Query execution plan for simple join query with a buffering factor of 3
+
+
+// Definitions of the tuple types 
+
+type InflowTuple is struct(integer evalEpoch; integer epoch; integer humidityVal)
+type OutflowTuple is struct(integer evalEpoch; integer epoch; integer temperatureVal)
+type JoinTuple is struct(integer evalTime; timeStamp; humidityVal; temperatureVal) 
+
+
+type IMain is interface (out bool startTimer);
+
+//This kicks off the timer
+component Main presents IMain {
+
+	constructor() {	
+	}
+		
+	behaviour {
+		send true on startTimer;	
+	}
+}
+
+
+
+// Timer component which periodically gives a tick
+// The input start channel starts/stops the timer depending on whether true or false is sent to it
+// The output tick channel sends something every timerInterval period
+
+type ITimer is interface(in bool start; out integer tick)
+
+component RepeatTimer presents ITimer {
+
+	//user specfies timeInterval during component instantiation
+	constructor(integer timeInterval) {
+	}
+
+	behaviour {
+	}
+} 
+
+//InflowAcquire component: linked to a timer and one or more Sensor Components.  At periodic intervals (i.e., when a timer tick is receievd)
+//requests a reading from the sensor(s), and creates a tuple accordingly
+type IInflowAcquire is interface(in integer tick; out bool request; in integer sensorReading; out InflowTuple pushTuple; out integer pushNoTuple)
+type IOutflowAcquire is interface(in integer tick; out bool request; in integer sensorReading; out OutflowTuple pushTuple; out integer pushNoTuple)
+
+component InflowAcquire presents IInflowAcquire {
+	integer reading;
+	integer epoch;
+    
+	constructor() {
+	}
+	behaviour {
+
+		receive epoch on tick;
+		send true on requestForData;
+		receive reading on sensorReading;
+		if (reading > 5) { //this could be any threshold
+			InflowTuple outputTuple = new InflowTuple( epoch, epoch, reading );
+			send outputTuple on pushTuple;
+		} else {
+			send false on pushNoTuple;
+		}
+	}
+} 
+
+//TODO: define an OutflowAcquire component similarly
+
+//This component ensures all tuples are accounted for before sending them on
+type IInflowBuffer presents (in InflowTuple receiveTuple; in integer receiveNoTuple; out InflowTuple pushTuple; out integer pushNoTuple);
+
+//This is the F3Buffer component which will be used for at site 1 and site 2
+//The buffering factor (and therefore, number of epochs to be stored in this buffer at a time) is 5
+//The number of expected tuples per epoch is 1
+//These appear as a magic number in the code because my understanding is that arrays need to be statically determinable at compile time
+//These will be filled in by the code generator
+component F3Buffer presents IInflowBuffer {
+	integer baseEpoch = 0;
+	integer[] tuplesPos = new integer[5] of 0; //the position of the next tuple in the array, on a per-epoch basis
+	integer[] tuplesAccountedFor = new integer[5] of 0; //number of tuples accounted for, on a per-epoch basis
+	buffer = new InflowTuple[5][1];
+
+	constructor() {
+	}
+	behaviour{
+		select {
+			receive tuple from receiveTuple : {
+				e = tuple.epoch % 5;
+				buffer[e][tuplePos[e]] = tuple;
+				tuplesPos[e]++;
+				tuplesAccountedFor[e]++;
+			}
+			receive noTupleEpoch from receiveNoTuple : {
+				e = tuple.epoch % 5;
+				tuplesAccountedFor[e]++;
+			}
+		}
+
+		bool allTuplesAccountedFor = true;
+		for (i = 0..5) {
+			if (tuplesAccountedFor[i]!=1) {
+				allTuplesAccountFor = false;
+				break; //Is this possible?
+			}
+		}
+			
+		if (allTuplesAccountedFor) {
+			for (i = 0..4) { //Note to self: this is inclusive
+				if (tuplesPos[i]>0) {
+					//send all tuples for that epoch
+					for (j = 0..tuplesPos[i]-1) {
+						send buffer[i][j] on pushTuple;	
+					}
+				} else {
+					//no tuples for that epoch
+					send (baseEpoch+i) on pushNoTuple;
+				}
+
+				//reset arrays for next iteration of component behaviour
+				tuplesPos[i] = 0;
+				tuplesAccountedFor = 0;
+			}
+			baseEpoch += 5;
+		}
+	}
+}
+
+//TODO: Pretty much the same thing for a F2BufferComponent for site 1. The only difference will be the tuple type supported. Would be nice to have generics!
+
+
+//Tx1to0 component
+//In general, Tx components will have a variable number of input channels, depending on the number of buffers connected to it. The code generator will have to take manage this accordingly (as it already does for nesC).
+//In the simple query plan, the tx component which sends data from site 1 to site 0 (which I will call Tx1to0) is connected a F2Buffer and an F3Buffer.  The tx component which sends data from site 2 to site 0 (which I will call Tx2to0) is connected to a single F3Buffer.
+//Basically, these components for now just send tuples on, a tuple per packet, without attempting to pack as many tuples as possible into a packet (although this would be a good idea to do soon)
+
+type ITx1to0 is interface(in InflowTuple receiveInflowTuple; in integer receiveNoInflowTuple; in OutflowTuple receiveOutflowTuple; in integer receiveNoOutflowTuple; out any radioChannel);
+
+type ITx2to0 is interface(in InflowTuple receiveInflowTuple; in integer receiveNoInflowTuple; out any radioChannel);
+
+
+component Tx1to0 presents ITx1to0 {
+	constructor() {}
+	behaviour {
+		select {
+			receive inflowTuple from receiveInflowTuple : {
+				//TODO: this needs to be serialised using syntax Jon will give me
+				send inflowTuple on radioChannel;
+			}
+			receive noInflowTuple from receiveNoInflowTuple : {
+				//TODO: this needs to be serialised using syntax Jon will give me
+				send noInflowTuple on radioChannel;
+			}
+			receive outflowTuple from receiveOutflowTuple : {
+				//TODO: this needs to be serialised using syntax Jon will give me
+				send outflowTuple on radioChannel;
+			}
+			receive noOutflowTuple from receiveNoOutflowTuple : {
+				//TODO: this needs to be serialised using syntax Jon will give me
+				send noOutflowTuple on radioChannel;
+			}
+		}
+	}
+}
+
+//TODO: Tx2to0 will be similar
+
+//The Rx component is responsible for receiving tuples from a particular node and putting them in the corresponding buffer,
+//depending on the fragment they are from.
+
+
+type IRx0 is interface(in any radioChannel; out InflowTuple receiveInflowTuple; out integer receiveNoInflowTuple; out OutflowTuple receiveOutflowTuple; out integer receiveNoOutflowTuple);
+
+component IRx0 presents ITx1to0 {
+	constructor() {}
+	behaviour {
+		receive radioPacket from radioChannel;
+		//TODO: this needs to be deserialised using syntax Jon will give me
+		//TODO: then depending on type will send along appropriate channel
+	}
+}
+
+//TODO: F2Buffer and F3 buffers to place between the rx and the join
+//This will be the same as the previous buffer definition, except for F3 where the numberOfExpectedTuplesPerEpoch = 2.
+
+//Join component
+//takes tuples of type inflow and outflow with the same epoch, and contacatenates them if they meet the join predicates
+//for the example query there are no join predicates so it's basically a cross product
+//we know that when we get a tuple from the next epoch, we can do the join, because of the semantics of the buffer components it is guaranteed that there won't be any more tuples from that epoch.
+
+type IJoin is interface(in InflowTuple receiveLeftTuple; in integer receiveNoLeftTuple; in OutflowTuple receiveRightTuple; in integer receiveNoRightTuple; out JoinTuple putTuple; out integer pushNoTuple )
+
+//TODO: this whole component needs revising
+component Join0 presents IJoin { 
+
+	integer currentEpoch = 0;
+	bool outputProduced = false;
+	
+	InflowTuple[] leftTupleBuffer = new InflowTuple[2];
+	integer leftTupleBufferPos;
+	
+	bool endOfLeftData;
+	InflowTuple nextEpochLeftTuple = InflowTuple(-1, -1, -1); //dummy tuple as null doesn't exist in Insense
+	bool noLeftDataInNextEpoch = false;
+	
+	bool endOfRightData;
+	OutflowTuple nextEpochRightTuple = OutflowTuple(-1, -1, -1); //dummy tuple as null doesn't exist in Insense
+	bool noRightDataInNextEpoch = false;
+	
+	constructor() {
+	} 
+
+
+	behaviour {
+
+	outputProduced = false;
+	leftTupleBufferPos = 0;
+	
+	//check if a tuple has already been received for current epoch
+	if (nextEpochLeftTuple.evalEpoch!=-1) {
+		leftTupleBuffer[leftTupleBufferPos] = nextEpochLeftTuple; //I assume this is a copy
+		leftTupleBufferPos++;
+		nextEpochLeftTuple = InflowTuple(-1, -1, -1); 
+	}
+	
+	//check if indication of no data has already been received for current epoch
+	if (noLeftDataInNextEpoch == true) {
+		endOfLeftData = true;
+		noLeftDataInNextEpoch = false;
+	} else {
+		endOfLeftData = false;
+	}
+	
+	
+	for (i = 0..1) { //a while loop would be better here!
+		if (endOfLeftData == false) {
+			select {
+				receive leftTuple from receiveLeftTuple: {
+					if (currentEpoch == leftTuple.evalEpoch) {
+						leftTupleBuffer[pos] = leftTuple;
+						leftTupleBufferPos++;
+					} else {
+						nextEpochLeftTuple = leftTuple; //copy assumed
+						endOfLeftData = true;
+					}
+				}
+				receive noLeftTuple from receiveNoLeftTuple: {
+					endOfLeftData = true;
+					if (noLeftTuple > currentEpoch) {
+						noLeftDataInNextEpoch = true;
+					}
+				}
+			}
+		}
+	}
+	
+	//check if a tuple has already been received for current epoch
+	if (nextEpochRightTuple.evalEpoch!=-1) {
+		for (i = 0; 0..(leftTupleBufferPos-1)) {
+			JoinTuple outTuple = new JoinTuple(evalEpoch, leftTupleBuffer[i].epoch, leftTupleBuffer[i].humidityVal, nextEpochRightTuple.temperatureVal);
+			send JoinTuple on putTuple;
+			outputProduced = true;
+		}
+
+		nextEpochRightTuple = OutflowTuple(-1, -1, -1); 
+	}
+	
+	//check if indication of no data has already been received for current epoch
+	if (noRightDataInNextEpoch == true) {
+		endOfRightData = true;
+		noRightDataInNextEpoch = false;
+	} else {
+		endOfRightData = false;
+	}	
+	for (i = 0..0) { //in this case a for loop looks weird, but this depends on the number of right hand side tuples expected.
+			 //it's simpler for for code-generation to always have it a for loop, even if it only executs once
+		if (endOfRightData == false) {
+			receive rightTuple from receiveRightTuple: {
+				if (currentEpoch == rightTuple.evalEpoch) {
+					//TODO: do the join and sent it along the output channel
+					JoinTuple outTuple = new JoinTuple(evalEpoch, leftTupleBuffer[i].epoch, leftTupleBuffer[i].humidityVal, rightTuple.temperatureVal);
+					send JoinTuple on putTuple;
+					outputProduced = true;					
+				} else {
+					nextEpochRightTuple = rightTuple;
+					endOfRightData = true;
+				}
+			}
+			receive noRightTuple from receiveNoRightTuple : {
+				endOfRightData = true;
+				if (noRightTuple > currentEpoch) {
+					noRightDataInNextEpoch = true;
+				}
+			}
+		}
+	}
+	
+	if (!outputProduced) {
+		send currentEpoch on pushNoTuple;
+	}
+	
+	currentEpoch++;
+	
+} 
+
+
+//deliver component on the sink node
+//receives tuples of a particular type, and writes them to the motes serial port to be displayed on PC
+//assumed to be part of infrastructure, so I will only propose a signature
+
+type IDeliver is interface(in JoinTuple receiveTuple; in integer receiveNoTuple; out any output);
+
+component Deliver0 presents IDeliver {
+
+	constructor() {	
+	}
+		
+	behaviour {
+		select {
+			receive tuple from receiveTuple : {
+
+				evalTime = tuple.evalEpoch * 5; //magic number is acquisition interval of query
+				time = tuple.epoch * 5; //magic number is acquisition interval of query
+
+				// send text+readings in struct on stdout
+				send (any("evaltime =")) on output
+				send (any(evalTime)) on output
+				send (any("\ttime = ")) on output
+				send (any(time)) on output
+				send (any("\thumidity = ")) on output
+				send (any(tuple.humidityVal)) on output
+				send (any("\ttemperature = ")) on output
+				send (any(tuple.temperatureVal)) on output
+				send (any("\n")) on output
+			}
+			receive noTupleEpoch from receiveNoTuple : {
+				time = noTupleEpoch * 5;
+			
+				send (any("no tuples for evalTime = ") on output
+				send (any(time) on output
+			}
+		}
+	}
+} 
+
+
+//Site 1 components
+
+timer1 = new RepeatTimer(5000)
+main1 = new Main();
+inflowAcquire1 = new InflowAcquire();
+outflowAcquire1 = new OutFlowAcquire();
+f3site1Buffer = new F3Buffer1();
+f2site1Buffer = new F2Buffer1();
+tx1to0 = new Tx1to0();
+
+connect main1.startTimer to timer1.start;
+connect timer1.tick to inflowAcquire1.tick;
+connect timer1.tick to outflowAcquire1.tick;
+connect inflowAcquire1.request to humiditySensor.request;
+connect outflowAcquire1.request to temperatureSensor.request;
+connect inflowAcquire1.sensorReading to humiditySensor.output;
+connect outflowAcquire1.sensorReading to temperatureSensor.output;
+connect inflowAcquire1.pushTuple to f3site1Buffer.receiveTuple;
+connect outflowAcquire1.pushTuple to f2site1Buffer.receiveTuple;
+connect inflowAcquire1.pushNoTuple to f3site1Buffer.receiveNoTuple;
+connect outflowAcquire1.pushNoTuple to f2site1Buffer.receiveNoTuple;
+connect f3site1Buffer.pushTuple to tx1to0.receiveInflowTuple;
+connect f3site1Buffer.pushNoTuple to tx1to0.receiveNoInflowTuple
+connect f2site1Buffer.pushTuple to tx1to0.receiveOutflowTuple
+connect f2site1Buffer.pushNoTuple to tx1to0.receiveNoOutflowTuple
+
+//Site 2 components
+
+timer2 = new RepeatTimer(5000)
+main2 = new Main();
+inflowAcquire2 = new InflowAcquire();
+f3site2Buffer = new F3Buffer2();
+tx2to0 = new Tx2to0;
+
+connect main1.startTimer to timer1.start;
+connect timer1.tick to inflowAcquire1.tick;
+connect inflowAcquire2.request to humiditySensor.request;
+connect inflowAcquire2.sensorReading to humiditySensor.output;
+connect inflowAcquire2.pushTuple to f3site2Buffer.receiveTuple;
+connect inflowAcquire2.pushNoTuple to f3site2Buffer.receiveNoTuple;
+connect f3site2Buffer.pushTuple to tx2to0.receiveInflowTuple;
+connect f3site2Buffer.pushNoTuple to tx2to0.receiveNoInflowTuple;
+
+//Site 0 components
+
+rx0 = new Rx0();
+f3site0Buffer = new F3Buffer0();
+f2site0Buffer = new F2Buffer0();
+join0 = new Join0();
+deliver0 = new Deliver0();
+
+connect rx0.pushInflowTuple to f3site0Buffer.receiveTuple;
+connect rx0.pushNoInflowTuple to f3site0Buffer.receiveNoTuple;
+connect rx0.pushOutflowTuple to f2site0Buffer.receiveTuple;
+connect rx0.pushNoOutflowTuple to f2site0Buffer.receiveNoTuple;
+connect f3site0Buffer.pushTuple to join.receiveLeftTuple;
+connect f3site0Buffer.pushNoTuple to join.receiveNoLeftTuple;
+connect f2site0Buffer.pushTuple to join.receiveRightTuple;
+connect f2site0Buffer.pushNoTuple to join.receiveNoRightTuple;
+connect join.pushTuple to deliver.receiveTuple;
+connect join.pushNoTuple to deliver.receiveNoTuple;
+
+
+connect inflowSensor7.pushTuple to inflowSelect7.receiveTuple
+connect inflowSelect7.pushTuple to timeWindow7.receiveTuple
+connect timeWindow7.pushTuple to join7.receiveLeftTuple
+connect join7.pushTuple to joinBuffer7.receiveTuple 
+
+
+// instantiate and wire components running on mote 9
+
+
+deliver9 = new JoinDeliver() 
+
+// wire components which are running on different motes
+connect buffer0.pushTuple to join7.receiveRightTuple
+connect buffer5.pushTuple to join7.receiveLeftTuple
+connect buffer2.pushTuple to join7.receiveRightTuple
+connect inflowBuffer4.pushTuple to join7.receiveLeftTuple
+connect outflowBuffer4.pushTuple to join7.receiveRightTuple
+connect buffer7.pushTuple to deliver9.receiveTuple

@@ -1,0 +1,36 @@
+// Simple intra-node sender-receiver program 
+//
+// @author jonl
+
+type ISender is interface ( out integer output )
+type IReceiver is interface ( in integer input )
+
+component Sender presents ISender {
+	
+	count = 0
+	
+	constructor(){
+	}
+	
+	behaviour{
+		send count on output
+		count := count + 1
+	}
+}
+
+component Receiver presents IReceiver {
+	
+	constructor(){
+	}
+	
+	behaviour{
+		receive count from input
+		printAny(any("\n"))
+		printAny(any(count))
+	}
+}
+
+
+s = new Sender()
+r = new Receiver()
+connect s.output to r.input

@@ -1,0 +1,70 @@
+
+type ISender is interface( in bool ticks ; out integer output ; out bool errchan)
+type IBinder is interface ( in bool errchan )
+type IReceiver is interface ( in integer input )
+
+component Sender presents ISender {
+
+	number = 0
+
+			constructor(){
+	}
+
+	behaviour {
+		receive tick from ticks
+		printString("S: sending value on output chan\n")
+		send number on output
+		number := number + 1
+		if number % 10 == 0 then {
+			printString("S: sent another 10 values ... disconnecting\n")
+			disconnect output
+			send true on errchan
+		}
+	}
+}
+
+
+
+component Receiver presents IReceiver {
+
+	proc printDetails(integer number){
+		printString("R: Got value ")
+		printInt(number)
+		printString("\n")
+	}
+
+	constructor() {
+	}
+
+	behaviour {
+		receive number from input
+		printDetails(number)
+	}
+}
+
+
+component Binder presents IBinder {
+
+	s = new Sender()
+	r = new Receiver()
+
+	constructor(){
+		setTimer(s.ticks, 2.0, true)
+		connect s.errchan to errchan
+	}
+
+	behaviour {
+		printString("B: Connecting sender to receiver ...\n")
+		connect s.output to r.input
+		receive ooops from errchan
+		printString("B: received oops on errchan ...\n")
+	}
+
+}
+
+
+//Insense main
+
+binder = new Binder()
+
+

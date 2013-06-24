@@ -1,0 +1,29 @@
+proc average( real[] i ) : real { return 0.0 }
+
+type TempAveragerIF is interface(	in real input;
+									out real output ) 
+									
+component TempAverager presents TempAveragerIF {
+	temps = new real[5] of 0.0
+	index = 0
+	size = 5
+
+	constructor() {
+	}
+
+	behaviour {
+		receive temp from input
+		temps[index] := temp
+		index := index + 1
+		if index == size - 1 then {
+			send average( temps ) on output
+			index := 0
+		}
+	}
+}
+
+
+
+
+
+

@@ -1,0 +1,47 @@
+// Simple program to test lazy copy code generation with aliasing of structs and arrays
+
+type sensorReading is struct	( integer photo ; integer solar )
+type sensorReadings is struct	( sensorReading[] readings )
+type matrix is struct			( integer[][] element )
+
+// Interface for Alias Tests
+type IAliasTest is interface (	out sensorReading readingChan ; out sensorReadings readingsChan ;
+								out integer[] arrayChan ; out integer[][] array2DChan ; 
+								out matrix matrixChan 
+								)
+
+// Sensor reader component
+component AliasTest presents IAliasTest {
+
+	vectorValues = new integer[4] of 0
+	matrixValues = new integer[3][3] of 0
+	//alias = new integer[1] of 0
+	constructor() {	
+	}
+		
+	behaviour {
+		myMatrix = new matrix(matrixValues)
+		send matrixValues on array2DChan
+		//send myMatrix on matrixChan
+		myMatrix.element[1][1] := 5
+		//matrixValues[1][1] := 5
+		
+		myReading1 = new sensorReading( vectorValues[0], vectorValues[1] )
+		myReading2 = new sensorReading( vectorValues[2], vectorValues[3] )
+		myReadingArray = new sensorReading[2] of myReading1
+		myReadingArray[1] := myReading2
+		
+		myReadings = new sensorReadings(myReadingArray)
+		
+		send myReadings on readingsChan
+		//send myReading1 on readingChan
+		//send myReadings on readingsChan
+		
+		vectorValues[2] := 8
+		
+		
+		
+	}
+} 
+
+at = new AliasTest()

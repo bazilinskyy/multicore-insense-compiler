@@ -1,0 +1,30 @@
+// Simple Hello World Insense program
+
+// Interface for Hello component
+type IHello is interface ( )
+
+// Hello World component
+component Hello presents IHello {
+
+	count = 0
+	limit = 0
+
+	proc doStuff(){
+		if count > limit then
+			stop
+		printAny(any("\nHello World "))
+		printAny(any(count))
+	}
+	
+	constructor(integer number) {
+		limit := number
+	}
+		
+	behaviour {
+		doStuff()
+		count := count + 1
+	}
+} 
+
+
+hello = new Hello(5)

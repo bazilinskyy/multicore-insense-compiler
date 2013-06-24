@@ -1,0 +1,46 @@
+// Simple Insense program demonstrating the use of stop
+
+// Interface for Hello component
+type IHello is interface ( out any trace )
+
+// Hello component
+component Hello presents IHello {
+
+	instanceId = 0
+	
+	constructor(integer number) {
+		instanceId := number 
+		connect trace to standardOut
+	}
+		
+	behaviour {
+		send  any(instanceId) on trace
+	}
+} 
+
+component Launcher presents ISchedulable {
+	
+	limit = 0
+	id = 0
+	hello = new Hello(id)
+	
+	proc useNewComponent(){
+		stop hello
+		id := id + 1
+		printAny(any("\nNew Comp\n"))
+		comp = new Hello(id)
+		hello := comp
+	}
+	
+	constructor(integer number){
+		periodicEnSchedule(inTicksChan, number)
+	}
+	
+	behaviour {
+		receive tick from inTicksChan
+		useNewComponent()
+	}
+}
+
+launcher = new Launcher(1)
+

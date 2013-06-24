@@ -1,0 +1,40 @@
+
+
+proc periodicEnSchedule( in bool appInTicksChan ; integer appTickTime ; in SchedulerRequest schedulerRequestsChan ) {
+		schedulerOutTicksChan = new out bool                           // new channel on which scheduler is to send ticks to the app 
+		connect appInTicksChan to schedulerOutTicksChan                // connect the app's inTicks channel to the scheduler's outTicks channel
+		appRequest = new SchedulerRequest( schedulerOutTicksChan, appTickTime ) // build app request to send to scheduler
+		procRequestsChan = new out SchedulerRequest                             // set up local procedure channel
+		connect procRequestsChan to schedulerRequestsChan              // connect local procedure channel to the shceduler's requests channel
+		send appRequest on procRequestsChan                            // send app request to scheduler on local procedure channel
+		disconnect procRequestsChan
+}
+
+type IPrint is interface (out any output)
+
+component App presents IPrint, ISchedulable {
+		
+	str = ""
+	
+	constructor(string appStr){
+		str := appStr
+	}
+	
+	behaviour {
+		receive tick from inTicksChan
+		send (any(str)) on output
+	}
+}
+
+app1 = new App("\nApp 10")
+connect app1.output to standardOut
+periodicEnSchedule( app1.inTicksChan, 10, scheduler.requestsChan )
+
+//app2 = new App("\nApp 13")
+//connect app2.output to standardOut
+//periodicEnSchedule( app2.inTicksChan, 13, scheduler.requestsChan )
+
+
+
+
+

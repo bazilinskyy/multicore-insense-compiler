@@ -1,0 +1,37 @@
+
+type ISender is interface( out integer output )
+type IReceiver is interface ( in integer input )
+
+component Sender presents ISender {
+
+	number = 0
+
+
+	constructor(){
+	}
+
+	behaviour {
+			send number on output
+			number := number + 1
+	}
+}
+
+
+component Receiver presents IReceiver {
+
+
+	constructor() {
+	}
+
+	behaviour {
+		receive number from input
+		printString("\nGot value ")
+		printInt(number)
+	}
+}
+
+//Insense main
+
+s = new Sender()
+r = new Receiver()
+connect r.input to s.output 

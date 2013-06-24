@@ -1,0 +1,82 @@
+Test	count	comment
+example1.isf    0	Tests general component structure
+example2.isf    0	Tests interface definitions
+example3.isf    0	Tests interface definitions with multiple types
+example4.isf    0	Tests interface definitions with multiple types
+example5.isf    0	Tests components exporting interfaces
+example6.isf    0	Tests components exporting multiple & unnamed interfaces
+example7.isf    1	Tests components exporting multiple & unnamed interfaces
+example8.isf    3	Tests component creation
+example9.isf    0	Tests component creation
+example10.isf   0	Tests multiple component definition
+example11.isf   2	Tests multiple component definition
+example12.isf   1	Tests constructor selection
+example13.isf   0	Tests function definition and call
+example14.isf   1	Tests function definition and call (2 params)
+example15.isf   1	Tests function definition and call (error case)
+example16.isf   1	Tests function definition and call (error case)
+example17.isf   0	Tests function definition and call (multiple params and types)
+example18.isf   4	Tests function definition and call (multiple calls with errors)
+example19.isf   0	Tests struct creation
+example20.isf   0	Tests array creation
+example21.isf   0	Tests channel selection from components
+example22.isf   2	Tests enums
+example23.isf   0	Tests assignment
+example24.isf   0	Tests simple expressions
+example25.isf   0	Tests for loops
+example26.isf   0	Tests if then else
+example27.isf   0	Tests connection and disconnection
+example28.isf   0	Tests stop
+example29.isf   0	Tests switch
+example30.isf   0	Tests select
+example30b.isf	0	Select with decl
+example31.isf   0	Tests match, receive etc. in simple real example
+example32.isf   0	Test for unary minus etc.
+example33.isf   0	Test of booleans
+example34.isf   0	Reference prog for cgen
+example35.isf   0	Extended version of 34 for cgen
+example36.isf   0	simpler version of 34 for cgen
+example37.isf   0	Complete version for cgen on mote
+example38.isf 	0	Test any
+example39.isf	0	Simple component
+example40.isf	1	Very simple component with no a constructor
+example41.isf	2	Component with no constructor
+example42.isf	0	Test complexity on RHS of decl
+example43.isf	0	Select test
+example44.isf	0	Simple runtime compiler test
+example45.isf	2	Tests to see that old syntax for component definitions is not accepted
+example46.isf	0	Tests that int+real and real+int are allowed in expressions
+example47.isf	0	Tests that the type of a clause block is the last argument
+example48.isf	0	Tests that the type of a clause block is the last argument 
+example49.isf	0	Example with ticks  
+example50.isf	0	Simple try catch block
+example51.isf	9	2 behaviours - error case - 9 is too high!
+example52.isf	0	Double try catch block
+example53.isf	0	Array assignment
+example54.isf	0	Array assignment with exception
+example55.isf	0	Array multiple dimensional selection
+example56.isf	0	Mixed dereferencing on RHS
+example57.isf	0	Mixed dereferencing on LHS
+example58.isf	0	Mixed dereferencing with if on rhs
+example59.isf	0	Tests copy copy on send for complex types.
+example60.isf	0	Tests copy copy on send for complex types - includes arrays
+example61.isf	0	Tests copy copy on send for complex types - includes arrays of structs
+example62.isf	5	Tests old function syntax - COULD DO BETTER WITH ERROR HANDLING!
+example63.isf	0	Tests old syntax for functions
+example64.isf	0	Tests functions
+example65.isf	0	Tests functions
+example66.isf	0	Example from IPSN paper?
+example67.isf	0	Example from IPSN/WSN composition paper?
+example68.isf	0	Channels of Channels (Chan chan)
+example68.isf	0	Channels of Channels (Chan chan)
+example69.isf	0	Messing about with Channels
+example70.isf	0	Clock example
+example71.isf	0	another clock
+example72.isf	0	Tests components exporting multiple & unnamed interfaces
+example73.isf	1	Assigning sub types of components
+example74.isf	0	Functions and channels - should be less errors
+example75.isf	0	Functions and channels - should be less errors
+example76.isf	6	Functions and channels - should be less errors
+
+
+

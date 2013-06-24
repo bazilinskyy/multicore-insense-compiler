@@ -1,0 +1,78 @@
+// Simple example of 3 senders and a single selector printing out
+// the received values to standard output that has type interface ( in any input )
+
+
+type ISelector is interface( in integer ticker, tocker, tacker ; out any stdOutChan )
+type ITucker is interface ( out integer output )
+
+component Selector presents ISelector {
+	
+	p = 10
+	
+	constructor() {
+	}
+	
+	behaviour {
+		send (any("\nSelector: Before select p=")) on stdOutChan
+		send (any(p)) on stdOutChan
+		select {
+			receive x from ticker when p > 100 : {send (any("\trx-tic ")) on stdOutChan ; p := x} 
+			receive y from tocker : {send (any("\trx-toc ")) on stdOutChan ; p := y}
+			receive z from tacker when p < 100 : {send (any("\trx-tac ")) on stdOutChan ; p := z}
+			default : {send (any("\tdefault ")) on stdOutChan ; p := 101}
+		}
+		send (any(" and after p=")) on stdOutChan
+		send (any(p)) on stdOutChan 
+	}
+}
+
+component Ticker presents ITucker {
+
+	value = 0
+		
+	constructor() {	
+	}
+	
+	behaviour {
+		send value on output
+		value := value + 1
+	}
+} 
+
+component Tocker presents ITucker {
+
+	value = -100
+		
+	constructor() {	
+	}
+	
+	behaviour {
+		send value on output
+		value := value + 1
+	}
+} 
+
+component Tacker presents ITucker {
+
+	value = 100
+		
+	constructor() {	
+	}
+	
+	behaviour {
+		send value on output
+		value := value + 1
+	}
+} 
+
+
+
+sel = new Selector()
+tic = new Ticker()
+toc = new Tocker()
+tac = new Tacker()
+
+connect tic.output to sel.ticker
+connect toc.output to sel.tocker
+connect tac.output to sel.tacker
+connect sel.stdOutChan to standardOut

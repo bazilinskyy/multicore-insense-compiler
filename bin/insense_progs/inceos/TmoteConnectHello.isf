@@ -1,0 +1,38 @@
+/*
+ * Insense program with 2 component instances, each printing a string 
+ * using the printTCString function and at a particular fequency.
+ * 
+ * 
+ * The printTCString function uses a print_tc C-function developed by 
+ * Jerome Bucca and permits strings to printed in a packet that can be forwarded 
+ * by a TMote Connect unit over an Ethernet network
+ * 
+ * @author jonl
+ * 
+ */
+
+
+type IHello is interface( in bool ticker )
+	
+component Hello presents IHello {
+
+	mesg = ""
+	
+	constructor(string s){
+		mesg := s
+	}
+	
+	behaviour {
+		receive tick from ticker
+		printTCString(mesg)
+	}
+}
+
+// Insense main
+
+helloFoo = new Hello("foobar\n")
+setTimer(helloFoo.ticker, 1.5, true)
+
+helloBar = new Hello("barfod\n")
+setTimer(helloBar.ticker, 2.0, true)
+

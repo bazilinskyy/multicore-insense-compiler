@@ -1,0 +1,21 @@
+	
+type IProg is interface( )
+	
+component Prog presents IProg {
+
+	constructor(){
+	}
+	
+	behaviour {
+		istring = "-12345"
+		i = parseInt(istring)
+		printString(istring)
+		printString(" parsed to integer: ")
+		printInt(i)
+		printString("\n")
+	}
+}
+
+// Insense main
+
+prog = new Prog()

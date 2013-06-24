@@ -1,0 +1,57 @@
+/*
+ * Experiment to investigate effects of thread placement and
+ * communication between components on performance of Insense programs.
+ *
+ *
+ * Copyright (c) 2013, Pavlo Bazilinskyy <pavlo.bazilinskyy@gmail.com>
+ * School of Computer Science, St. Andrews University
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+
+type IComp is interface () // Interface for Hello component
+
+// Component with one array that is dynamically created in the behaviour function
+component Comp presents IComp {
+	runTime = 5000	// Amount of times behaviour is to be executed.
+	count = 0		// Used to track number of times behaviour has executed.
+	
+	constructor() {}
+
+	behaviour {
+		a = new integer[1000][5] of 0  // 5002 allocation take place
+		
+		count := count + 1 // Increment a counter of executions of behaviour
+		// Show percentage done: 50% - 100%
+		if (count % (runTime / 2) == 0) then {		
+			printInt(100 / (runTime / count))
+			printString("% done.\n")
+		}
+		// If a limit of execution has been exceeded - stop
+		if (count >= runTime) then {
+			stop
+		}
+	}
+} 
+
+// Create and test components
+comp1 = new Comp()
+comp2 = new Comp()
+comp3 = new Comp()
+comp4 = new Comp()

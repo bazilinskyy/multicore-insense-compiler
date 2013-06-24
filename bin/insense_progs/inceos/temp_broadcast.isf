@@ -1,0 +1,33 @@
+// Simple Insense program that gets tempertaure sensor readings and
+// sends these over the radio using the broadcast primitive 
+
+// Interface for Temperature Broadcaster
+type ITempBroadcast is interface (
+		out bool tempRequest ;
+		in integer tempValue ; 
+		out any broadcastSend
+)
+
+// Temperature Broadcaster component
+component TempBroadcast presents ITempBroadcast {
+	
+	constructor() {
+	}
+	
+	behaviour {
+		// get solar sensor reading
+		send true on tempRequest
+		receive reading from tempValue
+		printString("Got reading: ")
+		printInt(reading)
+		printString("\nSending on broadcast channel\n")
+		send any(reading) on broadcastSend
+		printString("Broadcast send done\n")
+	}
+} 
+
+tbc = new TempBroadcast()
+
+connect tbc.tempRequest to sensors.tempRequest
+connect tbc.tempValue to sensors.tempOut
+connect tbc.broadcastSend to radio.broadcastSend

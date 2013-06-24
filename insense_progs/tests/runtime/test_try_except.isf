@@ -1,0 +1,54 @@
+// Simple example showing how to use try-except for send
+
+type ISender is interface ( out integer output )
+type IReceiver is interface ( in integer input )
+
+component Sender presents ISender {
+		
+	count = 0
+	fail = 0
+	unknown = 0
+	
+	constructor(){}
+	
+	behaviour {
+		try {
+			send count on output
+			printAny(any("\nS: success :-)"))
+			count := count + 1
+		} except NodesUnreachableException {
+			printAny(any("\nS: failed :-|"))
+			fail := fail + 1
+		} except SendStatusUnknownException {
+			printAny(any("\nS: status unknown :-("))
+			unknown := unknown + 1
+		}
+	}
+}
+
+
+component Receiver presents IReceiver {
+		
+	constructor(){}
+	
+	behaviour {
+		acknowledge value from input after {
+			printAny(any("\nR: got "))
+			printAny(any(value))
+			// can't throw in ack after clause
+			// instead alter generated C-code to return 
+			// SendStatusUnknownException ... to test this  
+		}
+	}
+}
+
+
+
+
+sender = new Sender()
+receiver = new Receiver()  
+
+connect sender.output to receiver.input
+
+
+

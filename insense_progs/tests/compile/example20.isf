@@ -1,0 +1,17 @@
+// Tests array creation
+
+type blah is integer[];
+type foo is interface( out integer xx )
+
+component Test presents foo {
+	
+	constructor() {
+		a = new integer[3][4] of 5
+		s = a[3];
+	}
+	
+	behaviour {
+		
+	}
+} 
+

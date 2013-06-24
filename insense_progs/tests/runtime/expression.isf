@@ -1,0 +1,26 @@
+type IExpression is interface ( out any output )
+
+component Expression presents IExpression {
+	
+	constructor(){
+	}
+	
+	behaviour {
+		a = 1+2+3+4+5
+		b = 1+2*(3-3)
+		c = false or true and true
+		d = (!false or true) and true
+		e = (!false or true) and (1 < 2 or 3 > 4)
+		f = (1 + 2) * ((3 + 4) * 5)
+		g = 1 + (-2 * (3-4))
+		h = 4.0/2
+		i = 4/2.0
+		j = 4/2
+		k = 4.0 >= 3
+		l = 3 < 4.0
+		m = #4 / #2
+		n = #255 < 256
+	}	
+} 
+
+expression = new Expression()

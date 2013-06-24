@@ -1,0 +1,17 @@
+// Tests simple expressions
+
+type wibblewobble is interface( out integer null )
+component Simple presents wibblewobble {
+	
+	y = 0 + 1;
+	
+	constructor() {
+	}
+	
+	behaviour {
+	}
+}
+
+
+
+

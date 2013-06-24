@@ -1,0 +1,50 @@
+22/4/08
+
+1. separate space alloc from rest of constructor, and call constructors as process (not done for now, would cost a lot of space)
+2. fix zero argument procs, vtbl + first class functions + ticker/timer
+3. Standard functions (length,equals, abs... )
+4. Testing & bug fixing of code generation
+5. Manual
+6. Tools - for assembly and programming.
+7. Running on invent
+8. binding to hardware
+9. Constructors
+10. Middleware - exposing channels from motes
+11. Automatic coercion of Anys
+12. String comparison code gen
+13. flash memory
+
+------
+
+1. Reflection
+
+Standard functions:
+
+Trig:
+sin( real -> real )
+cos( real -> real )
+exp( real -> real )
+ln( real -> real )
+sqrt( real -> real )
+atan( real -> real )
+
+coercion int real byte: truncate( real -> int )
+
+length( string -> int )
+
+shift.r( cint,cint -> int ) syntax >>
+shift.l( cint,cint -> int ) syntax <<
+
+b.and( cint,cint -> int ) syntax &
+b.or( cint,cint -> int )  syntax |
+b.not( cint -> int )			syntax
+b.xor( cint,cint -> int )	syntax
+
+random( cint -> int )  	??
+
+date( -> string )	??
+time( -> int )	??
+
+
+
+

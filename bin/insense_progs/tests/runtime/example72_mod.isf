@@ -1,0 +1,58 @@
+// Tests components exporting multiple & unnamed interfaces
+
+type IReader is interface( in integer input )
+
+type vision is interface( out integer piccies  )
+type sound is interface( out integer noise )
+type button is interface( in bool power )
+
+component Television presents sound,vision,button {
+	
+	size = 0;
+	
+	constructor() {
+	}	
+	
+	behaviour {
+		
+	}
+}
+
+component Television2 presents button,vision,sound {
+	
+	size = 0;
+	megaPixels = 10
+	
+	constructor() {
+	}	
+	
+	behaviour {
+		
+	}
+}
+
+component Radio presents sound,button {
+
+	size = 0;
+	
+	constructor() {
+	}	
+	
+	behaviour {
+		
+	}
+	
+}
+
+
+tv = new Television()
+tv2 = new Television2()
+tv2 := tv
+newPics = new out integer
+tv2.piccies := newPics
+newPics := tv.piccies
+//radio = new Radio()
+//radio := tv2
+//radio := tv
+//tv := radio
+//tv2 := radio

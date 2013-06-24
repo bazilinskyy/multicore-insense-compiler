@@ -1,0 +1,43 @@
+// Simple example showing how to schedule applications
+
+type IPrint is interface (out any output) // to print out trace
+type ILed is interface (out bool ledState) // to interact with LEDs on mote
+
+// App only needs to present ISchedulable in order to be scheduled
+// ISchedulable declares a channel 'in bool inTicksChan'
+// The other interfaces here are for debugging purposes
+component App presents IPrint, ILed, ISchedulable {
+		
+	dutyCycle = 0
+	firstRun = true
+	
+	constructor(integer ds){
+		dutyCycle := ds
+	}
+	
+	behaviour {
+		if firstRun then {
+			periodicEnSchedule( inTicksChan, dutyCycle )
+			firstRun := false
+		}
+		receive tick from inTicksChan
+		send true on ledState
+		send (any("\nApp ")) on output
+		send (any(dutyCycle)) on output
+		send false on ledState
+	}
+}
+
+app1 = new App(4)
+connect app1.output to standardOut
+connect app1.ledState to leds.greenState
+
+
+app2 = new App(13)
+connect app2.output to standardOut
+connect app2.ledState to leds.redState
+
+
+
+
+

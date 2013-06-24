@@ -1,0 +1,123 @@
+// Query execution plan for simple join query with a buffering factor of 3
+
+
+// Definitions of the tuple types 
+type InflowTuple is struct(integer evalEpoch ; integer epoch ; real humidityVal)
+
+//InflowAcquire component: linked to a timer and one or more Sensor Components.  At periodic intervals (i.e., when a timer tick is receievd)
+//requests a reading from the sensor(s), and creates a tuple accordingly
+type IInflowAcquire is interface(out bool request; in real sensorReading; out InflowTuple pushTuple; out integer pushNoTuple)
+
+component InflowAcquire presents IInflowAcquire {
+	reading = 0.0
+	epoch = 0
+    
+	constructor() {
+	}
+	behaviour {
+
+		send true on request
+		receive reading from sensorReading
+		outputTuple = new InflowTuple(epoch, epoch, reading)
+		if true then { //code generator may replace with predicate
+			send outputTuple on pushTuple;
+		} else {
+			send epoch on pushNoTuple;
+		}
+	}
+} 
+
+//This component ensures all tuples are accounted for before sending them on
+type IInflowBuffer is interface (in InflowTuple receiveTuple; in integer receiveNoTuple; out InflowTuple pushTuple; out integer pushNoTuple);
+
+//This is the F3Buffer component which will be used for at site 1 and site 2
+//The buffering factor (and therefore, number of epochs to be stored in this buffer at a time) is 3
+//The number of expected tuples per epoch is 1
+//These appear as a magic number in the code because my understanding is that arrays need to be statically determinable at compile time
+//These will be filled in by the code generator
+component F3Buffer2 presents IInflowBuffer {
+	baseEpoch = 0
+	tuplesPos = new integer[3] of 0  //the position of the next tuple in the array, on a per-epoch basis
+	tuplesAccountedFor = new integer[3] of 0 //number of tuples accounted for, on a per-epoch basis
+	dummyTuple = new InflowTuple(0, 0, 0.0)
+	buffer = new InflowTuple[3][1] of dummyTuple;
+
+	constructor() {
+	}
+	behaviour{
+		e = 0
+		select {
+			receive tuple from receiveTuple : {
+				e := tuple.epoch % 3;
+				buffer[e][tuplesPos[e]] := tuple;
+				tuplesPos[e] := tuplesPos[e] + 1;
+				tuplesAccountedFor[e] := tuplesAccountedFor[e] + 1;
+			}
+			receive noTupleEpoch from receiveNoTuple : {
+				e := tuple.epoch % 3;
+				tuplesAccountedFor[e] := tuplesAccountedFor[e] + 1;
+			}
+		}
+
+		allTuplesAccountedFor = true;
+		for c1 = 0 .. 2 : 1 do {
+			if tuplesAccountedFor[c1] != 1 then {
+				allTuplesAccountFor = false;
+				// break; JL NOTE: no break at present
+			}
+		}
+		
+		tupleToSend = dummyTuple // ************ added to avoid CODE GEN issue 
+		if allTuplesAccountedFor then {
+			for i = 0 .. 2 : 1 do {
+				if tuplesPos[i] > 0 then {
+					//send all tuples for that epoch
+					for j = 0 .. tuplesPos[i]-1 : 1 do {
+						tupleToSend := buffer[i][j]
+						//send buffer[i][j] on pushTuple; // ******************** CODE GEN PROBLEM ***************************
+						send tupleToSend on pushTuple
+					}
+				} else {
+					//no tuples for that epoch
+					send (baseEpoch+i) on pushNoTuple;
+				}
+
+				//reset arrays for next iteration of component behaviour
+				tuplesPos[i] := 0;
+				// tuplesAccountedFor = 0; // JL Note, you meant allTuplesAccountedFor
+				allTuplesAccountedFor := false
+			}
+			baseEpoch := baseEpoch + 3;
+		}
+	}
+}
+
+type ITx2to0 is interface(in InflowTuple receiveInflowTuple; in integer receiveNoInflowTuple; out any radioChannel);
+
+component Tx2to0 presents ITx2to0 {
+	constructor() {}
+	behaviour {
+		select {
+			receive inflowTuple from receiveInflowTuple : {
+				send (any(inflowTuple)) on radioChannel;
+			}
+			receive noInflowTuple from receiveNoInflowTuple : {
+				send (any(noInflowTuple)) on radioChannel;
+			}
+		}
+	}
+}
+
+
+//components
+inflowAcquire2 = new InflowAcquire();
+f3Buffer2 = new F3Buffer2();
+tx2to0 = new Tx2to0();
+
+connect inflowAcquire2.request to humiditySensor.request;
+connect inflowAcquire2.sensorReading to humiditySensor.output;
+connect inflowAcquire2.pushTuple to f3Buffer2.receiveTuple;
+connect inflowAcquire2.pushNoTuple to f3Buffer2.receiveNoTuple;
+connect f3Buffer2.pushTuple to tx2to0.receiveInflowTuple;
+connect f3Buffer2.pushNoTuple to tx2to0.receiveNoInflowTuple;
+

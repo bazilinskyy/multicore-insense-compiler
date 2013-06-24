@@ -1,0 +1,21 @@
+	
+type IProg is interface( )
+	
+component Prog presents IProg {
+
+	constructor(){
+	}
+	
+	behaviour {
+		ustring = "65535"
+		u = parseUnsignedInt(ustring)
+		printString(ustring)
+		printString(" parsed to unsigned: ")
+		printUnsignedInt(u)
+		printString("\n")
+	}
+}
+
+// Insense main
+
+prog = new Prog()

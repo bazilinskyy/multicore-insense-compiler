@@ -1,0 +1,20 @@
+type t2 is interface( in integer input; out integer output )
+
+component TempAverager presents t2 {
+	size = 2
+	store = new integer[2] of 0
+	index = 0;
+
+	constructor() {
+	}
+
+	behaviour {
+		receive next from input
+		store[index] := next
+		index := index + 1
+		if index >= size then {
+			send next on output
+			index := 0
+		}
+	}
+}

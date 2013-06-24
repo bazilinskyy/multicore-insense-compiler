@@ -1,0 +1,31 @@
+// Illegal Insense program with unbounded memory use
+// Constructs an ever growing linked list 
+
+// Type for list node
+type Node is struct (integer head ; any tail )
+
+// Interface for Illegal Insense component that constructs an ever growing list
+// contains trace channel to print debug info to standard output
+type IIllegal is interface ( out any trace )
+
+
+// Illegal Insense component that constructs an ever growing list
+component Illegal presents IIllegal {
+
+	nullTail = any(0)
+	list = new Node(0, nullTail)
+	cycle = 1
+	
+	constructor() {	
+	}
+		
+	behaviour {
+		newNode = new Node(cycle, any(list))
+		list := newNode
+		send any(cycle) on trace
+		cycle := cycle + 1
+	}
+} 
+
+illegal = new Illegal()
+connect illegal.trace to standardOut

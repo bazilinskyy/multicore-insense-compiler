@@ -1,0 +1,27 @@
+// Tests components presenting multiple interfaces
+
+type foo is interface( in integer t1,t2; out integer bs )
+type bar is interface( in integer ticker,tocker; out integer bob )
+
+component Radio presents bar,foo {
+	
+	size = 0;
+	
+	constructor() {
+	}
+	
+	constructor( in integer startticks ) {
+		ticker = startticks;
+	}
+	
+	constructor( in integer startticks; integer framesize ) { 
+		ticker = startticks;
+	}	
+	
+	behaviour {
+		
+	}
+}
+ 
+
+

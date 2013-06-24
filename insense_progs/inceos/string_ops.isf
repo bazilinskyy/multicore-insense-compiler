@@ -1,0 +1,23 @@
+	
+type IProg is interface( )
+	
+component Prog presents IProg {
+
+	constructor(){
+	}
+	
+	behaviour {
+		printString("\nWhat is your name\n");
+		name = getString()
+		if stringEquals(name, "Jon") then {
+			printString("Good man! ")
+		}
+		printString("Nice to meet you ")
+		printString(name)
+	}
+}
+
+// Insense main
+
+prog = new Prog()
+

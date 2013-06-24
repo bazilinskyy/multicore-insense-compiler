@@ -1,0 +1,123 @@
+/*
+ * Experiment to investigate effects of thread placement and communication
+ * between components on performance.
+ *
+ * Experiment 4: 8 Dispatch instances are connected to 8 Workers with 8 channels.
+ *
+ * Copyright (c) 2013, Pavlo Bazilinskyy <pavlo.bazilinskyy@gmail.com>
+ * School of Computer Science, St. Andrews University
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+
+type IWorker is interface( in integer input )
+type IDispatch is interface( out integer output )
+
+component Dispatch presents IDispatch {
+	runTime = 300	// Amount of times behaviour is to be executed.
+	count = 0		// Used to track number of times behaviour has executed.
+	calcTime = 100 	// How many times a server is requested to perform computation
+	
+	constructor(){ }
+
+	behaviour {
+		// First send an int to a server
+		send calcTime on output
+		
+		count := count + 1 // Increment a counter of executions of behaviour
+		// Show percentage done: 50% - 100%
+		if (count % (runTime / 2) == 0) then {		
+			printInt(100 / (runTime / count))
+			printString("% done.\n")
+		}
+		// If a limit of execution has been exceeded - stop
+		if (count >= runTime) then {
+			stop
+		}
+	}
+}
+
+component Worker presents IWorker {
+	a = new integer[1000][5] of 0 // Array used for computations.
+	runTime = 100	// Amount of times behaviour is to be executed.
+	count = 0		// Used to track number of times behaviour has executed.
+	
+	// Increment elements of an array "num" times
+	proc incrementArray(integer num) {
+		for i = 0 .. num do {
+			for j = 0 .. a.length-1 do {
+				for k = 0 .. a[j].length-1 do {
+					a[j][k] := a[j][k] + 1
+				}
+			}
+		}
+	}
+	
+	constructor(){ }
+
+	behaviour {
+		// First receive an int from a client
+		receive calcTime from input
+		
+		// Perform calculations
+		incrementArray(calcTime)
+		
+		count := count + 1 // Increment a counter of executions of behaviour
+		// Show percentage done: 50% - 100%
+		if (count % (runTime / 2) == 0) then {		
+			printInt(100 / (runTime / count))
+			printString("% done.\n")
+		}
+		// If a limit of execution has been exceeded - stop
+		if (count >= runTime) then {
+			stop
+		}
+	}
+}
+
+//Insense main
+dispatch1 = new Dispatch()
+dispatch2 = new Dispatch()
+dispatch3 = new Dispatch()
+worker1 = new Worker()
+worker2 = new Worker()
+worker3 = new Worker()
+worker4 = new Worker()
+worker5 = new Worker()
+worker6 = new Worker()
+worker7 = new Worker()
+worker8 = new Worker()
+worker9 = new Worker()
+worker10 = new Worker()
+worker11 = new Worker()
+worker12 = new Worker()
+
+// Connect dispatch instances and workers with channels.
+connect dispatch1.output to worker1.input
+connect dispatch1.output to worker2.input
+connect dispatch1.output to worker3.input
+connect dispatch1.output to worker4.input
+connect dispatch2.output to worker5.input
+connect dispatch2.output to worker6.input
+connect dispatch2.output to worker7.input
+connect dispatch2.output to worker8.input
+connect dispatch3.output to worker9.input
+connect dispatch3.output to worker10.input
+connect dispatch3.output to worker11.input
+connect dispatch3.output to worker12.input

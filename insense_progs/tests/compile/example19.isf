@@ -1,0 +1,22 @@
+// Tests tuple creation
+
+type foo is struct( integer a; string b );
+
+type bar is struct( integer a; string b );
+
+type i is interface( in integer a )
+
+component Test presents i {
+	
+	constructor() {
+		p = new foo( 4, "abc" );
+		q = new foo( 3, "xyz" )
+		p := q
+		s = p.a
+		
+	}
+	
+	behaviour {
+	}
+} 
+

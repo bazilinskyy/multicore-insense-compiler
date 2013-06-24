@@ -1,0 +1,140 @@
+/*
+ * Experiment to investigate effects of thread placement and communication
+ * between components on performance.
+ *
+ * Experiment 3: 1 Server is connected to 15 Clients with 15 channels.
+ * Servers perform Read and Write operations on elements of the array.
+ *
+ * Copyright (c) 2013, Pavlo Bazilinskyy <pavlo.bazilinskyy@gmail.com>
+ * School of Computer Science, St. Andrews University
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+
+type IServer is interface( in integer input )
+type IClient is interface( out integer output )
+
+component Client presents IClient {
+	myId = 0		// ID of the component
+	runTime = 800	// Amount of times behaviour is to be executed.
+	count = 0		// Used to track number of times behaviour has executed.
+	calcTime = 100 	// How many times a server is requested to perform computation
+	
+	constructor(integer id){
+		myId   := id
+	}
+
+	behaviour {
+		// First send an int to a server
+		send calcTime on output
+		
+		count := count + 1
+		
+		// Show percentage done: 50% - 100%
+		if (count % (runTime / 2) == 0) then {		
+			printInt(100 / (runTime / count))
+			printString("% done.\n")
+		}
+		
+		if (count >= runTime) then {
+			stop
+		}
+	}
+}
+
+component Server presents IServer {
+	a = new integer[1000][5] of 0 // Array used for computations.
+	myId = 0		// ID of the component.
+	runTime = 100	// Amount of times behaviour is to be executed.
+	count = 0		// Used to track number of times behaviour has executed.
+	
+	// Increment elements of an array "num" times
+	proc incrementArray(integer num) {
+		for i = 0 .. num do {
+			for j = 0 .. a.length-1 do {
+				for k = 0 .. a[j].length-1 do {
+					a[j][k] := a[j][k] + 1
+				}
+			}
+		}
+	}
+	
+	constructor(integer id){
+		myId := id
+	}
+
+	behaviour {
+		// First receive an int from a client
+		receive calcTime from input
+		
+		// Perform calculations
+		incrementArray(calcTime)
+		
+		
+		// Increment a counter of executions of behaviour
+		count := count + 1
+		
+		// Show percentage done: 50% - 100%
+		if (count % (runTime / 2) == 0) then {		
+			printInt(100 / (runTime / count))
+			printString("% done.\n")
+		}
+		
+		// If a limit of execution has been exceeded - stop
+		if (count >= runTime) then {
+			stop
+		}
+	}
+}
+
+//Insense main
+server1 = new Server(1)
+
+client1 = new Client(1)
+client2 = new Client(2)
+client3 = new Client(3)
+client4 = new Client(4)
+client5 = new Client(5)
+client6 = new Client(6)
+client7 = new Client(7)
+client8 = new Client(8)
+client9 = new Client(9)
+client10 = new Client(10)
+client11 = new Client(11)
+client12 = new Client(12)
+client13 = new Client(13)
+client14 = new Client(14)
+client15 = new Client(15)
+
+// Connect clients and servers with channels.
+connect client1.output to server1.input
+connect client2.output to server1.input
+connect client3.output to server1.input
+connect client4.output to server1.input
+connect client5.output to server1.input
+connect client6.output to server1.input
+connect client7.output to server1.input
+connect client8.output to server1.input
+connect client9.output to server1.input
+connect client10.output to server1.input
+connect client11.output to server1.input
+connect client12.output to server1.input
+connect client13.output to server1.input
+connect client14.output to server1.input
+connect client15.output to server1.input

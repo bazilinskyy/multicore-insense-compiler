@@ -1,0 +1,24 @@
+
+
+type foo is interface( in integer ticker,tocker,tacker )
+
+component selectTest presents foo {
+	
+	p = 8
+	
+	constructor() {
+	}
+	
+	behaviour {
+		select {
+			receive x from ticker when p > 7 : { p := x }
+			receive y from tacker : p := y
+			receive z from tacker when p < 7 : p := z
+			default: p := 1
+		}
+	}
+
+}
+
+
+

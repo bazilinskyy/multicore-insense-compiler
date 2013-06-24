@@ -1,0 +1,20 @@
+// Tests switch
+type fakeinterface is interface(out integer null)
+component SwitchTest presents fakeinterface {
+	
+	 x = 0;
+	
+	constructor() {
+	}
+	
+	behaviour {
+		    case x of 
+			4:		  x := 1
+			6:		  x := 2
+			default:  x := 3
+	}
+}
+
+
+
+

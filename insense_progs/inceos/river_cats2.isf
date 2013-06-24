@@ -1,0 +1,351 @@
+/*
+ * Application to collect sensor readings from accelorometer + tilt sensors
+ * save them in external flash
+ * and dump them back across the radio when requested
+ */ 
+ 
+ /*-------------------------------------------------------------------------*/
+ type msgType is enum (s, h, p, sp, e, d, sd, hd, pd, spd, ed, dd)
+ type nodeReplyMsg is struct(msgType class ; unsigned value)
+ 
+ type bufferGroup is struct(unsigned todo; integer[] a ; integer[] b ;integer[] c ;integer[] d)
+ /*-------------------------------------------------------------------------*/
+ proc createRadioPacket (unsigned dest ; msgType m ; unsigned v ) : RadioPacket {
+ 
+		nrm = new nodeReplyMsg(m, v)
+		p = new RadioPacket(dest , any(nrm))
+		return p
+}
+/*-------------------------------------------------------------------------*/
+ proc createReadStruct (in integer[] reader ; integer[] dataBuffer ) : readStruct {
+ 
+		rs = new readStruct(reader, dataBuffer)
+		return rs
+}
+/*-------------------------------------------------------------------------*/
+ proc createBufferStruct (unsigned addr ; integer[] buf) : RadioPacket {
+ 
+		rp = new RadioPacket(addr, any(buf))
+		return rp
+}
+/*-------------------------------------------------------------------------*/
+ proc createStreamRequest (byte id ; integer[] buf) : streamReq {
+ 
+		sr = new streamReq(id, buf)
+		return sr
+}
+/*-------------------------------------------------------------------------*/
+ proc createArray () : integer[] {
+ 
+		a = new integer[25] of 0
+		return a
+}
+/*-------------------------------------------------------------------------*/
+type IdataGather is interface( 	    out streamReq axBuf  ; out unsigned axPeriod ; //in bool axDone ;
+									out streamReq ayBuf  ; out unsigned ayPeriod ; //in bool ayDone ;
+									out streamReq txBuf  ; out unsigned txPeriod ; //in bool txDone ;
+									out streamReq tyBuf  ; out unsigned tyPeriod ; //in bool tyDone ;
+									in  streamReq axBufferDone ; in  streamReq ayBufferDone ; in  streamReq txBufferDone ; in  streamReq tyBufferDone ;
+									in  bool controller  ;
+									out integer[] writeChan)
+
+component dataGather presents IdataGather {
+	
+
+	//here we have 5 100 int arrays split into groups of 4 @ 25 each
+	//buffers = new integer[20][25] of 0
+
+	empty = new integer[1] of 0
+	b = new bufferGroup($0, empty, empty, empty, empty)
+	
+	bufs = new bufferGroup[3] of b
+	req = new streamReq(intToByte(0), b.a)
+		
+	running 			= false
+	period 				= $80
+	numBufferGroups 	= $3
+	numBuffers			= $4
+	
+	constructor(){
+		for i = 0 .. numBufferGroups-1 do {
+			bufs[i].todo := $0
+			bufs[i].a := createArray()
+			bufs[i].b := createArray()
+			bufs[i].c := createArray()
+			bufs[i].d := createArray()
+		}
+	}
+	
+	behaviour {
+		
+		printString("Data loop\n")
+		
+		/* LOGIC
+		* supply a number of buffers of to the sensor reader component in groups (4 sensor buffer per group)
+		* when 1 group is done write to flash + repost their buffers
+		
+		*/
+		
+		select {
+			receive message from controller : {	
+				printString("got message from controller\n")
+				if(!running and message) then {
+					printString("initial sensor request\n")
+					if (!running)then{
+						for i = 0 .. numBufferGroups-1 do {
+							tmp = createStreamRequest(intToByte(i), bufs[i].a)
+							send tmp on axBuf
+							
+							tmp := createStreamRequest(intToByte(i), bufs[i].b)
+							send tmp on ayBuf
+							
+							tmp := createStreamRequest(intToByte(i), bufs[i].c)
+							send tmp on txBuf
+							
+							tmp := createStreamRequest(intToByte(i), bufs[i].d)
+							send tmp on tyBuf							
+									
+							bufs[i].todo := numBuffers
+							
+						}
+						send period on axPeriod
+						send period on ayPeriod
+						send period on txPeriod
+						send period on tyPeriod
+					}
+				}
+				else {
+						printString("got stop request\n")
+						send $0 on axPeriod
+						send $0 on ayPeriod
+						send $0 on txPeriod
+						send $0 on tyPeriod
+					}
+				running := message
+				setRedLedPower(running)
+			}
+			
+
+				
+			receive reply from axBufferDone :{
+				for i = 0 .. numBufferGroups-1 do {
+					if(reply.id == i) then {
+						//printString("AX: TODO:") ; printUnsignedInt(bufs[i].todo) ; printString(" i:") ; printInt(i); printString("\n") ;
+						bufs[i].a := reply.buffer
+						bufs[i].todo := bufs[i].todo - $1
+					}
+				}
+			}
+			
+			receive reply from ayBufferDone :{
+				for i = 0 .. numBufferGroups-1 do {
+					if(reply.id == i) then {
+						//printString("AY: TODO:") ; printUnsignedInt(bufs[i].todo)  ;printString(" i:"); printInt(i); printString("\n");
+						bufs[i].b := reply.buffer
+						bufs[i].todo := bufs[i].todo - $1
+					}
+				}
+			}
+			
+			receive reply from txBufferDone :{
+				for i = 0 .. numBufferGroups-1 do {
+					if(reply.id == i) then {
+						//printString("TX: TODO:"); printUnsignedInt(bufs[i].todo) ;printString(" i:"); printInt(i); printString("\n");
+						bufs[i].c := reply.buffer
+						bufs[i].todo := bufs[i].todo - $1
+					}
+				}
+			}
+			
+			receive reply from tyBufferDone :{
+				for i = 0 .. numBufferGroups-1 do {
+					if(reply.id == i) then {
+						//printString("TY: TODO:") ;printUnsignedInt(bufs[i].todo); printString(" i:"); printInt(i); printString("\n");
+						bufs[i].d := reply.buffer
+						bufs[i].todo := bufs[i].todo - $1
+					}
+				}
+			}
+			
+			/*
+			receive done from axDone : {}
+			receive done from ayDone : {}
+			receive done from txDone : {}
+			receive done from tyDone : {}
+			*/
+		}
+		
+		for i = 0 .. numBufferGroups-1 do {
+			if(bufs[i].todo == 0) then {
+				printString("MAIN: write out\n")
+				
+				//repost these buffers
+				tmp = createStreamRequest(intToByte(i), bufs[i].a)
+				send tmp on axBuf
+				
+				tmp := createStreamRequest(intToByte(i), bufs[i].b)
+				send tmp on ayBuf
+				
+				tmp := createStreamRequest(intToByte(i), bufs[i].c)
+				send tmp on txBuf
+				
+				tmp := createStreamRequest(intToByte(i), bufs[i].d)
+				send tmp on tyBuf	
+						
+				//update the not done counter
+				bufs[i].todo := numBuffers
+					
+				//set the sensors off
+				send period on axPeriod
+				send period on ayPeriod
+				send period on txPeriod
+				send period on tyPeriod
+				
+				//write the data out
+				send bufs[i].a on writeChan
+				send bufs[i].b on writeChan
+				send bufs[i].c on writeChan
+				send bufs[i].d on writeChan
+				
+			}
+		}
+	}
+}
+/*-------------------------------------------------------------------------*/
+/*
+* This component will be responsible for listening to the radio and servicing requests 
+* which come from the base station
+*/
+
+type Icontrol is interface(	in RadioPacket ether ; 
+							out RadioPacket baseStation ; in bool sendResult ;
+							out bool controlChan ; 
+							out bool eraseChan ; 
+							out readStruct readChan ;
+							in integer[] reader ;
+							out bool dataSizeReq ; in unsigned dataSizeVal)
+
+component control presents Icontrol{
+
+	dataBuffer = new integer[25] of 0
+	end = 10
+	constructor(){}
+	
+	behaviour{
+	
+		printString("control: begin\n")
+		
+		receive packet from ether
+		
+		printString("got packet from ether\n")
+		
+		//what type of message did the packet contain?
+		project packet.payload as message onto
+			msgType : {
+				// start message: start logging
+				if message == s then {
+					printString("start\n")
+					send true on controlChan
+					
+					send createRadioPacket(packet.addr, sd, $1) on baseStation
+				}
+				
+				// stop message: stop logging
+				else if message == h then {
+					printString("halt\n")
+					send false on controlChan
+					
+					send createRadioPacket(packet.addr, hd, $1) on baseStation
+				}
+								
+				//ping message: reply with ID
+				else if message == p then {
+					printString("ping\n")
+					send createRadioPacket(packet.addr, pd, getNodeAddress()) on baseStation
+				}
+				
+				//available flash space message: how much data have we stored
+				else if message == sp then {
+					printString("space (used_size)\n")
+					send true on dataSizeReq
+					receive val from dataSizeVal
+					
+				    send createRadioPacket(packet.addr, spd, val) on baseStation
+				}
+				
+				//clear flash message: erase all stored data (there should be a counter for this in storage.c)
+				else if message == e then {
+					printString("erase\n")
+					send true on eraseChan
+					
+					send createRadioPacket(packet.addr, ed, $1) on baseStation
+				}
+				
+				//dump message: send all stored data to base
+				else if message == d then {
+					printString("dump\n")
+
+					for i = 0 .. end do {
+						rs = createReadStruct(reader,dataBuffer)
+						printString("get data from storage\n")
+						send rs on readChan
+						receive buf from reader
+						
+						if(buf.length == 1) then{
+							i := end
+							printString("emptyBuffer\n")
+						}
+						else{
+							i := i - 1
+							printString("send it back\n")
+							bs = createBufferStruct(packet.addr, buf)
+							
+							send bs on baseStation
+							receive result from sendResult
+						}
+					}
+
+					tmp = createRadioPacket(packet.addr, dd, $0) 
+					send  tmp on baseStation
+				}
+			}
+			// always need a default
+			default : {}	
+	}
+}
+/*-------------------------------------------------------------------------*/
+ctl = new control()
+collector = new dataGather()
+/*-------------------------------------------------------------------------*/
+connect ctl.ether       to radio.received
+connect ctl.baseStation to radio.reliableUnicastSend		//reliable
+connect ctl.sendResult  to radio.reliableResult
+connect ctl.controlChan to collector.controller
+connect ctl.eraseChan   to storage.erase	
+connect ctl.dataSizeReq to storage.offsetReq
+connect ctl.dataSizeVal to storage.offsetVal
+connect ctl.readChan    to storage.read
+/*-------------------------------------------------------------------------*/
+
+connect collector.axBuf  to accelxSensor.postBuffer
+connect collector.ayBuf  to accelySensor.postBuffer
+connect collector.txBuf  to tiltxSensor.postBuffer
+connect collector.tyBuf  to tiltySensor.postBuffer
+
+connect collector.axPeriod  to accelxSensor.setPeriod
+connect collector.ayPeriod  to accelySensor.setPeriod
+connect collector.txPeriod  to tiltxSensor.setPeriod
+connect collector.tyPeriod  to tiltySensor.setPeriod
+
+connect collector.axBufferDone to accelxSensor.bufferDone
+connect collector.ayBufferDone  to accelySensor.bufferDone
+connect collector.txBufferDone  to tiltxSensor.bufferDone
+connect collector.tyBufferDone  to tiltySensor.bufferDone
+
+//connect collector.axDone  to accelxSensor.noMoreBuffers
+//connect collector.ayDone  to accelySensor.noMoreBuffers
+//connect collector.txDone to tiltxSensor.noMoreBuffers
+//connect collector.tyDone  to tiltySensor.noMoreBuffers
+
+connect collector.writeChan to storage.write
+

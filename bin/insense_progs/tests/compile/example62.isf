@@ -1,0 +1,25 @@
+// Tests old syntax for functions
+
+type foo is interface( in integer input; out string trace )
+
+component Receiver presents foo  {
+
+	a = 0
+	
+	function f integer ( integer a ) {
+		3
+	}
+	
+	behaviour {
+		a := f(7)
+	 }
+	
+}
+
+
+
+
+
+
+
+

@@ -1,0 +1,203 @@
+/*
+Node 2 Query execution plan for simple select query with a buffering factor of 3
+
+Query finds unoccupied rooms with a high temperature
+
+ SELECT RSTREAM Rooms.id, Rooms.temp
+    FROM Rooms[NOW]
+       where temp > 30
+         and light < 100;
+*/
+
+
+// Definitions of the tuple types 
+type RoomTuple is struct(integer evalEpoch; integer id ; real temp)
+// Denotes a null tuple (i.e., the operation results in no tuple being produced)
+type NullRoomTuple is struct(integer evalEpoch ; integer numTuples)
+// Denotes a missing tuple which has not been accounted for
+type MissingRoomTuple is struct(integer missingEvalEpoch ; integer missingNumTuples)
+
+// RoomAcquire component: Requests a reading from the light and temperature sensors,
+// and sends the tuple over an intranode channel to the BufferAndTransmit component. 
+// The user-specified predicate is high temperature and low light, i.e. it is met if 
+// the temperature is greater than 30 and the light is less than 100. 
+// Tuples are sent to the next operator (implemented by the the BufferAndTransmit component) when the predicate is met.
+// Tuples are discarded and not sent to the BufferAndTransmit component if the predicate is not met. Instead the epoch of the discarded tuple 
+// is sent to the BufferAndTransmit component on the pushNoTuple channel (so the next operator knows not to expect data for that epoch).  
+// This is intended to be linked to a timer component, so that at periodic intervals (i.e., when a timer tick is received) a tuple 
+// is generated; however, for now, it is just repeatedly executing as quickly as possible.
+
+
+
+proc printTuple(string s; RoomTuple t; out any chan){
+	send(any("\n")) on chan
+	send (any(s)) on chan
+	send (any(" tuple: (epoch=")) on chan
+	send (any(t.evalEpoch)) on chan
+	send (any(", id=")) on chan
+	send (any(t.id)) on chan
+	send (any(", temp=")) on chan
+	send (any(t.temp)) on chan
+	send (any(")")) on chan
+}
+
+
+type IRoomAcquire is interface(out bool tempRequestChan; out bool lightRequestChan; in real tempReadingChan; in integer lightReadingChan; 
+                               out RoomTuple pushTupleChan; out NullRoomTuple pushNullTupleChan; out MissingRoomTuple pushMissingTupleChan; 
+                               out any trace)
+
+component RoomAcquire presents IRoomAcquire {
+	
+	epoch = 0
+    nodeId = 2
+    tempThresh = 26
+    lightThresh = 100
+    
+	constructor() {
+	}
+	
+	behaviour {
+
+		send true on tempRequestChan
+		receive tempReading from tempReadingChan
+		send true on lightRequestChan
+		receive lightReading from lightReadingChan
+		
+		outputTuple = new RoomTuple(epoch, nodeId, tempReading)
+		noTuple = new NullRoomTuple(epoch, 1)
+		if /*tempReading < tempThresh*/ /*tempReading > tempThresh and lightReading < lightThresh*/ true then {
+			send outputTuple on pushTupleChan; // send tuple to the BufferAndTransmit
+		} else {
+			//if no tuple to be produced, send the epoch number to the BufferAndTransmit
+			send noTuple on pushNullTupleChan;
+		}
+		epoch := epoch + 1
+	}
+} 
+
+
+//The BufferAndTransmit component is responsible for buffering, merging logical sub-streams, and sending buffered data to the Radio. 
+//Note that in this case there is only one sub-stream.  However, since the query has a buffering factor of 3, 3 epochs of tuples 
+// need to be accounted for before they are sent on.
+
+type IRoomBufferAndTransmit is interface (in RoomTuple receiveTupleChan; in NullRoomTuple receiveNullTupleChan; 
+	in MissingRoomTuple receiveMissingTupleChan ; in bool successChan ; out RucRadioData radioChan ; out byte[] radioSetNodeAddress ; out any trace);
+
+
+component RoomBufferAndTransmit presents IRoomBufferAndTransmit {
+
+	dest = new byte[2] of #0
+	nodeAddr = new byte[2] of #0
+	firstRun = true
+	
+	baseEpoch = 0   // lowest epoch number of tuples in this buffer  
+
+	dummyTuple = new RoomTuple(0, 0, 0.0)		//just for padding purposes
+	buffer = new RoomTuple[3][1] of dummyTuple; //buffering factor = 3, num sub-streams = 1
+
+	
+	tuplesPos = new integer[3] of 0  		    // the position in the buffer array of the next tuple in the array, on a per-epoch basis
+	tuplesAccountedFor = new integer[3] of 0 	// number of tuples accounted for each epoch
+
+	constructor() {
+		nodeAddr[0] := #138
+		nodeAddr[1] := #2
+		dest[0] := #138
+		dest[1] := #0
+	}
+	
+	behaviour{
+		epoch = -1
+		if firstRun then{
+			send nodeAddr on radioSetNodeAddress
+			firstRun := false
+		}		
+		select {
+			receive tuple from receiveTupleChan : {
+				epoch := tuple.evalEpoch % 3;
+				buffer[epoch][tuplesPos[epoch]] := tuple;
+				tuplesPos[epoch] := tuplesPos[epoch] + 1;
+				tuplesAccountedFor[epoch] := tuplesAccountedFor[epoch] + 1;
+			}
+			receive noRoomTuple from receiveNullTupleChan : {
+				epoch := noRoomTuple.evalEpoch % 3; // JL & IX scoping issue tuple is in scope here
+				tuplesAccountedFor[epoch] := tuplesAccountedFor[epoch] + 1;
+			}
+		}
+
+		allTuplesAccountedFor = true;
+		for epochCount = 0 .. 2 do {
+			if tuplesAccountedFor[epochCount] < 1 then {
+				allTuplesAccountedFor := false; // need assignment to allTuplesAccountedFor not decl of new var // break JL NOTE: no break at present
+			}
+		}
+
+		tupleToSend = dummyTuple // ************ added to avoid CODE GEN issue 
+		nullTuple = new NullRoomTuple(-1, -1)
+		
+		//unicast stuff
+		anyDummy = (any(dummyTuple))
+		anyNullTuple = any(nullTuple)
+		dataPacket = new RucRadioData(dest, anyDummy)
+		nullPacket = new RucRadioData(dest, anyNullTuple)
+		
+		if allTuplesAccountedFor then {
+			for epochCount2 = 0 .. 2 do {
+				if tuplesPos[epochCount2] > 0 then {
+					//send all tuples for that epoch
+					for subStreamCount = 0 .. tuplesPos[epochCount2]-1 : 1 do {
+						tupleToSend := buffer[epochCount2][subStreamCount]
+   						printTuple("Buffer sending radio", tupleToSend, trace)
+
+   						anyTuple = (any(tupleToSend))
+   						dataPacket.payload := anyTuple
+   						send dataPacket on radioChan
+   						receive sendSuccess from successChan
+   						boolAny = (any(sendSuccess)) 
+   						send boolAny on trace
+					}
+				} else {
+					nullTuple.evalEpoch := baseEpoch+epochCount2
+					nullTuple.numTuples := 1
+					anyNullTuple := (any(nullTuple))
+					nullPacket.payload := anyNullTuple
+					send nullPacket on radioChan
+					receive sendNullSuccess from successChan
+					boolAny := (any(sendNullSuccess)) 
+					send boolAny on trace					
+				}
+
+				//reset arrays for next iteration of component behaviour
+				tuplesPos[epochCount2] := 0;
+				tuplesAccountedFor[epochCount2] := 0
+			}
+			baseEpoch := baseEpoch + 3; //increase base epoch by buffering factor
+		}
+	}
+}
+
+
+//components
+
+roomAcquire = new RoomAcquire();
+roomBufferAndTransmit = new RoomBufferAndTransmit();
+
+//connecting components
+
+connect roomAcquire.tempRequestChan to temperatureSensor.request;
+connect roomAcquire.tempReadingChan to temperatureSensor.output;
+connect roomAcquire.trace to standardOut
+
+connect roomAcquire.lightRequestChan to photoSensor.request;
+connect roomAcquire.lightReadingChan to photoSensor.output;
+
+connect roomAcquire.pushTupleChan to roomBufferAndTransmit.receiveTupleChan;
+connect roomAcquire.pushNullTupleChan to roomBufferAndTransmit.receiveNullTupleChan;
+connect roomAcquire.pushMissingTupleChan to roomBufferAndTransmit.receiveMissingTupleChan;
+
+connect roomBufferAndTransmit.radioChan to rucRadioOut.iochannel;
+connect roomBufferAndTransmit.successChan to rucRadioOut.success
+connect roomBufferAndTransmit.trace to standardOut
+connect roomBufferAndTransmit.radioSetNodeAddress to rucRadio.setNodeAddress
+
+

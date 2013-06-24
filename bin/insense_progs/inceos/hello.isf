@@ -1,0 +1,21 @@
+	
+type IHello is interface( )
+	
+component Hello presents IHello {
+
+	mesg = ""
+	
+	constructor(string s){
+		mesg := s
+	}
+	
+	behaviour {
+		printString(mesg)
+	}
+}
+
+// Insense main
+
+helloFoo = new Hello("foo\n")
+helloBar = new Hello("bar\n")
+

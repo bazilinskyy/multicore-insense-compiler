@@ -1,0 +1,78 @@
+
+type Request is struct( out bool outTicks ; integer tickTime )
+
+type IScheduler is interface( in Request requestsChan ; in bool RTC)
+type IRealTimeClock is interface( out bool tick )
+type IScheduleHelper is interface ( out bool outTicks )
+type ISchedulable is interface( in bool inTicks )
+
+component Scheduler presents IScheduler {
+
+	// scheduleList = new List of channels and 
+	
+	proc addToScheduleList( Request request ) {
+		// add request to scheduler list
+	}
+	
+	proc sendTicks() {
+		// looks in scheduler list to see if any sends are needed
+		// if they are it does them
+	}
+
+	constructor(){
+	}
+	
+	behaviour {
+		select {
+			receive tick from RTC  : { sendTicks() }
+			receive request from requestsChan : { addToScheduleList( request ) }
+		}
+	}
+}
+
+// component that sends clock signals to the scheduler at a sensible 
+component RealTimeClock presents IRealTimeClock {
+
+	constructor(){}
+	
+	behaviour {
+		// put contiki etimer event wait here for sensible minimum time 
+		send true on tick
+	}
+}
+
+
+component scheduleHelper presents IScheduleHelper {
+
+	constructor( integer tickTime ; in Request requestsChan ) {
+		request = new Request( outTicks, tickTime )
+		mychan = new out Request
+		connect mychan to requestsChan
+		send request on mychan
+	}
+	
+	behaviour {
+	}
+}
+
+component someComponent presents ISchedulable {
+			
+	constructor(){
+	}
+	
+	behaviour {
+		receive tick from inTicks
+		// do stuff
+	}
+}
+
+rtc = new RealTimeClock()
+sched = new Scheduler()
+
+helper = new scheduleHelper( 10, sched.requestsChan )
+myapp = new someComponent()
+connect myapp.inTicks to helper.outTicks
+
+
+
+

@@ -1,0 +1,44 @@
+/*
+ *
+ * Computational stress test by lots of calculations of the fast fourrier
+ * transform
+ */
+type stressI is interface()
+
+component stress presents stressI {
+
+    data = new integer[40] of 0
+    
+    constructor() {
+
+    }
+
+    behaviour {
+
+        for j = 0 .. 100 do {
+        	max = 0
+            ifft(data, data.length)
+
+            for i = 0 .. data.length-1 do {
+                if(data[i] > max) then {
+                    max := data[i]
+                }
+            }
+            
+        }
+        stop
+    }
+}
+
+/*********************************************************************/
+
+s1 = new stress()
+
+s2 = new stress()
+        
+
+
+s3 = new stress()
+
+
+s4 = new stress()

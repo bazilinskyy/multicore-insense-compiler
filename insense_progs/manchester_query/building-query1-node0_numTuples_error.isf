@@ -1,0 +1,276 @@
+/*
+Node 0 (Sink) Query execution plan for simple select query with a buffering factor of 3
+
+Query finds unoccupied rooms with a high temperature
+
+ SELECT RSTREAM Rooms.id, Rooms.temp
+    FROM Rooms[NOW]
+       where temp > 30
+         and light < 100;
+*/
+
+// TODO JL numTuples error in code generator missing out constructor arguments such as on line 42 causes incorrect code generation, missing fields in the C-struct. May still be issue with structs having same field types/names. 
+// Definitions of the tuple types 
+type RoomTuple is struct(integer evalEpoch; integer id ; real temp)
+// Denotes a null tuple (i.e., the operation results in no tuple being produced)
+type NoRoomTuple is struct(integer evalEpoch ; integer numTuples)
+// Denotes a missing tuple which has not been accounted for
+type MissingRoomTuple is struct(integer missingEvalEpoch ; integer missingNumTuples)
+
+proc printTuple(string s; RoomTuple t; out any chan){
+	send(any("\n")) on chan
+	send (any(s)) on chan
+	send (any(" tuple: (epoch=")) on chan
+	send (any(t.evalEpoch)) on chan
+	send (any(", id=")) on chan
+	send (any(t.id)) on chan
+	send (any(", temp=")) on chan
+	send (any(t.temp)) on chan
+	send (any(")")) on chan
+}
+
+
+
+type IReceiver is interface(in any radioChan ; out RoomTuple pushTupleChan; out NoRoomTuple pushNoTupleChan; out any trace);
+
+component Receiver presents IReceiver {
+	
+	constructor(){}
+	
+	behaviour{
+		roomTupleToSend = new RoomTuple(0, 0, 0.0)
+		noRoomTupleToSend = new NoRoomTuple(0)
+		receive radioPacket from radioChan
+		project radioPacket as val onto
+			RoomTuple : {
+				roomTupleToSend := val 
+				send roomTupleToSend on pushTupleChan
+				//printTuple("Receiver project roomtuple", roomTupleToSend, trace)
+			}
+			NoRoomTuple : {
+				noRoomTupleToSend := val
+				send noRoomTupleToSend on pushNoTupleChan
+			}
+			default : {
+				
+			}
+	}
+}
+
+proc getBaseEpochPos (integer tupleBaseEpoch; integer baseEpoch; integer bufferingFactor; 
+		integer baseEpochPos; integer numAgendaEvalsToBuffer) : integer {
+	tupleBaseEpochPos = 
+		(((tupleBaseEpoch - baseEpoch) / bufferingFactor) + baseEpochPos) % numAgendaEvalsToBuffer
+	return tupleBaseEpochPos
+}	
+
+		
+// The RoomBuffer component is responsible for buffering and sending buffered data to the Deliver component. 
+
+type IRoomBuffer is interface (in RoomTuple receiveTupleChan; in NoRoomTuple receiveNoTupleChan;
+    in MissingRoomTuple receiveMissingRoomTupleChan ;
+	out RoomTuple pushTupleChan; out NoRoomTuple pushNoTupleChan ; out MissingRoomTuple pushMissingTupleChan ; 
+	out any trace);
+
+component RoomBuffer presents IRoomBuffer {
+	
+	numAgendaEvalsToBuffer = 4
+	bufferingFactor = 3
+	numSubstreams = 2
+	
+	dummyTuple = new RoomTuple(0, 0, 0.0)		    //just for padding purposes
+	noDummyTuple = new NoRoomTuple(-1, -1)
+	missingDummyTuple = new MissingRoomTuple(-1, -1)
+	buffer = new RoomTuple[4][3][2] of dummyTuple;  //[x][y][z] where 
+													//x=agenda_evals_to_buffer (circular list)
+													//y=buffering factor 
+													//z=num sub-streams
+
+	baseEpoch = 0   	// lowest epoch number of tuples in this buffer  
+	baseEpochPos = 0	// the position of the baseEpoch in the first dimension of buffer
+						// this is implemented as a circular list to avoid copying tuples
+
+	epochTuplesCount = new integer[4][3] of 0  		// the position in the buffer array of the next tuple in the array, on a per-epoch basis
+	tuplesAccountedFor = new integer[4][3] of 0 	// number of tuples accounted for each epoch
+	tuplesMissing = new integer[4][3] of 0			// tuples which are known to be missing for epoch
+
+	//
+	proc sendEpochTuplesFromBuffer(integer baseEpochPos ; integer baseEpoch ; integer epochOffset ; 
+		RoomTuple[][][] buffer ; integer[][] epochTuplesCount ; integer[][] tuplesAccountedFor ; 
+		integer numSubstreams ; out RoomTuple pushTupleChan ; out NoRoomTuple pushNoTupleChan ;
+		out MissingRoomTuple pushMissingTupleChan ; 
+		RoomTuple roomTuple ; NoRoomTuple noRoomTuple ; MissingRoomTuple missingRoomTuple) {  
+		//the last three are dummy parameters
+	
+		//send tuples which have been received for this epoch 
+		for subStreamCount = 0 .. epochTuplesCount[baseEpochPos][epochOffset]-1 : 1 do {
+			roomTuple := buffer[baseEpochPos][epochOffset][subStreamCount]
+			send roomTuple on pushTupleChan
+			//printTuple("Buffer send to deliver", tupleToSend, trace)
+		}
+
+		//send noTuples message if received for this epoch
+		numNoTuples = tuplesAccountedFor[baseEpochPos][epochOffset] - epochTuplesCount[baseEpochPos][epochOffset]; 
+		if numNoTuples > 0 then {
+			noRoomTuple.evalEpoch := baseEpoch+epochOffset
+			noRoomTuple.numTuples := numNoTuples
+			send noRoomTuple on pushNoTupleChan;
+		}
+		
+		//if not all tuples have been accounted for, create a MissingTuple method
+		numMissingTuples = numSubstreams - tuplesAccountedFor[baseEpochPos][epochOffset]
+		if numMissingTuples > 0 then {
+			missingRoomTuple.missingEvalEpoch := baseEpoch+epochOffset
+			missingRoomTuple.missingNumTuples := numMissingTuples
+			send missingRoomTuple on pushMissingTupleChan;
+		}
+	}
+	
+	
+	constructor() {
+	}
+	
+	behaviour{
+		tupleBaseEpoch = -1			// the first epoch in the agenda evaluation that the tuple was acquired in
+		tupleEpochOffset = -1    	// the epoch number in the agenda evaluation that the tuple was acquired in
+		tupleBaseEpochPos = -1		// the position in the circular list which corresponds to this tupleBaseEpoch
+				
+		select {
+			receive tuple from receiveTupleChan : {
+				tupleBaseEpoch := (tuple.evalEpoch / bufferingFactor) * bufferingFactor;
+				if tupleBaseEpoch < baseEpoch then {
+					//old tuple received
+					printTuple("Tuple from older epoch discarded", tuple, trace);
+					
+				} else if tupleBaseEpoch > baseEpoch + numAgendaEvalsToBuffer then {
+					
+					// If a tuple arrives which is too new to fit in buffer, need to send old tuples on
+					// TODO: send everything from baseEpoch to (tupleBaseEpoch - numAgendaEvalsToBuffer)
+					for tmpEpoch = baseEpoch .. (tupleBaseEpoch - (numAgendaEvalsToBuffer * bufferingFactor)) do {
+						tmpBaseEpoch = (tmpEpoch / bufferingFactor) * bufferingFactor;
+						tmpBaseEpochPos = getBaseEpochPos(tmpBaseEpoch, baseEpoch, bufferingFactor, 
+								baseEpochPos, numAgendaEvalsToBuffer) 
+						tmpEpochOffset = tmpEpoch % bufferingFactor;
+						sendEpochTuplesFromBuffer(tmpBaseEpochPos, tmpBaseEpoch, tmpEpochOffset, 
+						buffer, epochTuplesCount, tuplesAccountedFor, numSubstreams, pushTupleChan, 
+						pushNoTupleChan, pushMissingTupleChan, dummyTuple, noDummyTuple, missingDummyTuple)
+						//Reset the respective arrays
+						//TODO: move next two lines into sendEpochTuplesFromBuffer when pass-by-reference 
+						//possible in Insense
+						epochTuplesCount[tmpBaseEpochPos][tmpEpochOffset] := 0;
+						tuplesAccountedFor[tmpBaseEpochPos][tmpEpochOffset] := 0
+					}
+					
+					baseEpoch := tupleBaseEpoch - numAgendaEvalsToBuffer + 1
+				}
+				//add the tuple to the buffer
+				tupleEpochOffset := tuple.evalEpoch % bufferingFactor;
+				tupleBaseEpochPos := getBaseEpochPos(tupleBaseEpoch, baseEpoch, bufferingFactor, 
+						baseEpochPos, numAgendaEvalsToBuffer) 
+				buffer[tupleBaseEpochPos][tupleEpochOffset][epochTuplesCount[tupleBaseEpochPos][tupleEpochOffset]] 
+				    := tuple;
+				epochTuplesCount[tupleBaseEpochPos][tupleEpochOffset] := 
+					epochTuplesCount[tupleBaseEpochPos][tupleEpochOffset] + 1;
+				tuplesAccountedFor[tupleBaseEpochPos][tupleEpochOffset] := 
+					tuplesAccountedFor[tupleBaseEpochPos][tupleEpochOffset] + 1;
+			}
+			receive noRoomTuple from receiveNoTupleChan : {
+				tupleBaseEpoch := (noRoomTuple.evalEpoch / bufferingFactor) * bufferingFactor;
+				tupleBaseEpochPos := getBaseEpochPos(tupleBaseEpoch, baseEpoch, bufferingFactor, 
+						baseEpochPos, numAgendaEvalsToBuffer)
+				tupleEpochOffset := noRoomTuple.evalEpoch % bufferingFactor;
+				
+				tuplesAccountedFor[tupleBaseEpochPos][tupleEpochOffset] := 
+					tuplesAccountedFor[tupleBaseEpochPos][tupleEpochOffset] + 
+					noRoomTuple.numTuples;
+			}
+			receive missingRoomTuple from receiveMissingRoomTupleChan : {
+				tupleBaseEpoch := (missingRoomTuple.missingEvalEpoch / bufferingFactor) * bufferingFactor;
+				tupleBaseEpochPos := getBaseEpochPos(tupleBaseEpoch, baseEpoch, bufferingFactor, 
+					baseEpochPos, numAgendaEvalsToBuffer)
+				tupleEpochOffset := missingRoomTuple.missingEvalEpoch % bufferingFactor;
+				tuplesMissing[tupleBaseEpochPos][tupleEpochOffset] := 
+					tuplesMissing[tupleBaseEpochPos][tupleEpochOffset] + 
+					missingRoomTuple.missingNumTuples;				
+			}
+		}
+
+		allTuplesAccountedFor = true;
+		for epochCount = 0 .. (bufferingFactor - 1) do {
+			if tuplesAccountedFor[0][epochCount] < numSubstreams then { 
+				allTuplesAccountedFor := false; // need assignment to allTuplesAccountedFor not decl of new var // break JL NOTE: no break at present
+			}
+		}
+			
+		tupleToSend = dummyTuple // ************ added to avoid CODE GEN issue 
+		noRoomPushTuple = noDummyTuple
+		if allTuplesAccountedFor then {
+			for epochCount2 = 0 .. 2 do {
+				if epochTuplesCount[0][epochCount2] > 0 then {
+					//send all tuples for that epoch
+					for subStreamCount = 0 .. epochTuplesCount[0][epochCount2]-1 : 1 do {
+						tupleToSend := buffer[0][epochCount2][subStreamCount]
+						send tupleToSend on pushTupleChan
+						//printTuple("Buffer send to deliver", tupleToSend, trace)
+					}
+				} else {
+					//no tuples for that epoch
+					noRoomPushTuple.evalEpoch := baseEpoch+epochCount2
+					send noRoomPushTuple on pushNoTupleChan;
+				}
+
+				//reset arrays for next iteration of component behaviour
+				epochTuplesCount[0][epochCount2] := 0;
+				tuplesAccountedFor[0][epochCount2] := 0
+			}
+			baseEpoch := baseEpoch + bufferingFactor; //increase base epoch by buffering factor
+		}
+	}
+}
+
+
+type IDeliver is interface(in RoomTuple receiveTupleChan; in NoRoomTuple receiveNoTupleChan; out any output);
+
+component Deliver presents IDeliver {
+
+	constructor() {	
+	}
+		
+	behaviour {
+	    // to fix CGEN error declare a join tuple outside select to force inclusion of header
+		select {
+			receive roomTuple from receiveTupleChan : {
+				// send text+readings in struct on stdout
+				send (any("\nepoch =")) on output
+				send (any(roomTuple.evalEpoch)) on output
+				send (any("\tid = ")) on output
+				send (any(roomTuple.id)) on output
+				send (any("\ttemp = ")) on output
+				send (any(roomTuple.temp)) on output
+			}
+			receive noRoomTuple from receiveNoTupleChan : {
+				send (any("no tuples for epoch = ")) on output
+				send (any(noRoomTuple.evalEpoch)) on output
+			}
+		}
+	}
+}
+
+
+//components
+
+receiver = new Receiver()
+roomBuffer = new RoomBuffer()
+deliver = new Deliver()
+
+//connecting components
+connect receiver.radioChan to radioIn.iochannel
+connect receiver.pushTupleChan to roomBuffer.receiveTupleChan
+connect receiver.pushNoTupleChan to roomBuffer.receiveNoTupleChan
+connect receiver.trace to standardOut
+
+connect roomBuffer.pushTupleChan to deliver.receiveTupleChan
+connect roomBuffer.pushNoTupleChan to deliver.receiveNoTupleChan
+connect roomBuffer.trace to standardOut
+
+connect deliver.output to standardOut

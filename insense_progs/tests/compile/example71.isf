@@ -1,0 +1,54 @@
+type every is struct( out bool notify; integer millisecs )
+
+type ISchedule is interface( in bool ticks )
+
+type IClock is interface( in every requests )
+type IClockRequest is interface( out every request )
+
+								
+component Clock presents IClock {
+
+	realtimeclock =  new in bool // really secret function create_rtc( 1 ) // new out bool, every 1 ms
+	
+	proc addToScheduleList( every request ) : bool {
+		return true
+	}
+	
+	proc doSomething(  integer a ) : bool {
+		return true
+	}
+	
+	constructor() {
+	}
+
+	behaviour {
+		select  {
+			receive x from realtimeclock  : { z = doSomething(2) }
+			receive request from requests : { y = addToScheduleList( request ) }
+		}
+	}
+		
+}
+
+
+
+component someComponent presents IClockRequest {
+
+	myclock = new in bool		// scheduler input
+	clockchan = new out bool	// scheduler output
+	
+	constructor() {
+			connect myclock to clockchan
+			scheduleRequest = new every( clockchan, 10  )
+			send scheduleRequest on request
+	}
+	
+	behaviour {
+		receive scheduleEvent from myclock
+		// do stuff
+	}
+}
+
+
+
+

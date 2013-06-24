@@ -1,0 +1,41 @@
+proc average( real[] i ) : real { return 0.0 }
+
+type TempAveragerIF is interface(	in real input;
+										out real output ) 
+component TempAverager presents TempAveragerIF {
+	temps = new real[5] of 0.0
+	index = 0
+	size = 5
+
+	constructor() {
+	}
+
+	behaviour {
+		receive temp from input
+		temps[index] := temp
+		index := index + 1
+		if index == size - 1 then {
+			send average( temps ) on output
+			index := 0
+		}
+	}
+}
+
+type TempGaugeIF is interface(	in real input;
+								in integer ticks;
+								out real output )
+								
+component TempGauge presents TempGaugeIF {
+
+	constructor() {
+	}
+
+	behaviour {
+		receive tick from ticks
+		receive temp from input
+		send temp on output
+	}
+}
+gauge = new TempGauge()
+averager = new TempAverager()
+connect gauge.output to averager.input

@@ -1,0 +1,57 @@
+
+type ILightSensor is interface (in bool ticks ; out integer output)
+type ILightSink is interface (in integer input)
+
+component LightSensor presents ILightSensor {
+	
+	constructor(){
+	}
+	
+	behaviour {
+		receive tick from ticks
+		send solarReading() on output
+	}
+}
+
+
+component LightSink presents ILightSink {
+	
+	proc printSolar(integer solar){
+		printString("\nGot reading solar radiation = ")
+		printInt(solar)
+	}
+	
+	constructor(){
+	}
+	
+	behaviour {
+		receive reading from input
+		printSolar(reading)
+	}
+}
+
+
+sensor = new LightSensor()
+sink = new LightSink()
+try {
+	publish sink.input as "light sink"
+
+	connect sensor.output to sink.input
+	connect sensor.output to "light sink" on $1
+	connect "light sink" on $1 to sensor.output
+	connect "a channel" on $2 to "another channel" on $3
+
+	disconnect sink.input
+	disconnect "light sink" on $1
+
+} except DuplicateLCNException {
+	printString("Ooops, LCN already in use\n")
+} except BindStatusUnknownException {
+	printString("Ooops, We don't no if it worked man\n")
+}
+
+setTimer(sensor.ticks, 30.0, true)
+
+
+disconnect sensor.output
+disconnect "light sink" on $1

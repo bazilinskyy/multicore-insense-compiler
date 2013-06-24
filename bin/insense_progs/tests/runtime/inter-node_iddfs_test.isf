@@ -1,0 +1,85 @@
+
+
+type ITest is interface(
+	out any trace
+)
+
+// forward decl needed for recursive proc findConnectingPath below
+type findConnectingPath is proc(integer ; integer ; integer ; integer ; integer[]) : bool  
+
+
+
+// Test component for Itertaive Deepengin Depth First Search proc
+// used to find routes in inter-node channel code 
+component Test presents ITest {
+	
+
+	
+	// simple boolean fixed size link-state (connectivity) matrix
+	linkState = new bool[4][4] of false
+	
+	proc displayRoute(string prefix ; integer[] route){
+		send any("\n") on trace
+		send any(prefix) on trace
+		send any("[") on trace
+		for i = 0 .. route.length-1 do {
+			send any(route[i]) on trace
+		}
+		send any("]") on trace
+	}
+	
+	
+	proc findConnectingPath(integer src, dest, hop, maxhops ; integer[] path) : bool {
+		if src == dest then { // have found path so we're done
+			return true
+		} 
+		// otherwise if we have not exceeded the hop limit try to 
+		// find a path to dest from the nodes connected to src 
+		if hop <= maxhops then {
+			for next = 0 .. linkState[0].length - 1 do {
+				if next != src and linkState[src][next] == true then {
+					path[hop] := next
+					displayRoute("> ", path)
+					if findConnectingPath(next, dest, hop+1, maxhops, path) then 
+						return true
+				}
+			}			
+		} // if we get to here we could not find a path
+		return false
+	}
+	
+	proc findMinimumHopPath(integer nodeIndex, destIndex ; integer[] path) : bool {
+		for maxhops = 1 .. path.length-1 do {
+			if findConnectingPath(nodeIndex, destIndex, 1, maxhops, path) then {
+				return true
+			}
+		}
+		return false
+	}
+	
+	proc findRoute(integer src, dest){
+		path = new integer[4] of src // 4 = number of nodes
+		if findMinimumHopPath(src, dest, path) then {
+			displayRoute("", path)			
+		}
+	}
+	
+	constructor(){
+		linkState[0,0] := true  ; linkState[0,1] := true  ; linkState[0,2] := true  ; linkState[0,3] := false
+		linkState[1,0] := false ; linkState[1,1] := true  ; linkState[1,2] := false ; linkState[1,3] := true
+		linkState[2,0] := true  ; linkState[2,1] := true  ; linkState[2,2] := true  ; linkState[2,3] := false
+		linkState[3,0] := false ; linkState[3,1] := false ; linkState[3,2] := true  ; linkState[3,3] := true
+	}
+	
+	behaviour {
+		findRoute(0, 3)
+		findRoute(2, 3)
+		findRoute(1, 0)
+		findRoute(3, 1)
+		stop;
+	}
+}
+
+
+test = new Test()
+connect test.trace to standardOut

@@ -1,0 +1,94 @@
+// Select example using acknowledge arms in order to act as proxy for some incoming channels
+
+type ISelector is interface( in integer ticker, tocker, tacker ; out integer output)
+type ITucker is interface ( out integer output )
+type IReceiver is interface ( in integer input )
+
+component Selector presents ISelector {
+	
+	a = 10
+	
+	constructor() {
+	}
+	
+	behaviour {
+		select {
+		    receive x from ticker when a > 7 : { 
+		    	a := x 
+		    	send 0 on output
+		    	printAny(any("Sel: completed forwarding tic\n"))
+		    }
+		    acknowledge y from tocker /*when a == 8*/ after : { 
+		    	a := y
+		    	send 1 on output
+		    	printAny(any("Sel: completed forwarding toc\n"))
+		    }
+		    acknowledge z from tacker when a < 7 after : {
+		    	a := z
+		    	send 2 on output
+		    	printAny(any("Sel: completed forwarding tac\n"))
+		    } 
+		    default: {
+		    	a := 8
+		    	send 3 on output
+		    	printAny(any("Sel: completed forwarding def\n"))
+		    }
+		}
+	}
+}
+
+component Tucker presents ITucker {
+
+	value = 0
+	id = 0
+		
+	constructor(integer inId, init) {
+		value := init
+		id := inId
+	}
+	
+	behaviour {
+		send value on output
+		if id == 0 then {
+			printAny(any("Tic: send complete\n"))
+		} else if id == 1 then {
+			printAny(any("Toc: send complete\n"))
+		} else if id == 2 then {
+			printAny(any("Tac: send complete\n"))
+		}
+		value := value + 1
+	}
+} 
+
+
+component Receiver presents IReceiver {
+	
+	constructor(){}
+	
+	behaviour {
+		acknowledge val from input after {
+			if val == 0 then {
+				printAny(any("Rec: got tic\n"))
+			} else if val == 1 then {
+				printAny(any("Rec: got toc\n"))
+			} else if val == 2 then {
+				printAny(any("Rec: got tac\n"))
+			} else if val == 3 then {
+				printAny(any("Rec: got def\n"))
+			}
+		}
+	}
+}
+
+
+ticker = new Tucker(0, 0)
+tocker = new Tucker(1, -100)
+tacker = new Tucker(2, 100)
+selector = new Selector()
+receiver = new Receiver()
+
+connect ticker.output to selector.ticker
+connect tocker.output to selector.tocker
+connect tacker.output to selector.tacker
+
+connect selector.output to receiver.input

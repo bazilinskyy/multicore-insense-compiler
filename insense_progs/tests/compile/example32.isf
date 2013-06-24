@@ -1,0 +1,24 @@
+// Tests unary minus etc.
+
+type sillyInterface is interface(out integer averylongnameforachanneloutputtoseeiflongnamesworkproperlyjustincasetheydonot)
+
+component Test presents sillyInterface {
+	s = 7
+	
+	constructor() {
+	}
+	
+	behaviour {
+		c = +8
+		a = -4
+		b = 5-a
+		d=1
+		e=-3
+		f = 8
+	}
+}
+
+
+
+
+

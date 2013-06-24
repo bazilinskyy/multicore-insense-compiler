@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="MacRoman" standalone="no"?>
+<jardesc>
+    <jar path="InsenseCompilerInceOS/InsenseCompilerInceOS.jar"/>
+    <options buildIfNeeded="true" compress="true" descriptionLocation="/InsenseCompilerInceOS/InsenseCompilerInceOS.jardesc" exportErrors="true" exportWarnings="true" includeDirectoryEntries="false" overwrite="false" saveDescription="true" storeRefactorings="false" useSourceFolders="false"/>
+    <storedRefactorings deprecationInfo="true" structuralOnly="false"/>
+    <selectedProjects/>
+    <manifest generateManifest="true" mainClassHandleIdentifier="=InsenseCompilerInceOS/&lt;uk.ac.stand.cs.insense.compiler{Compiler.java[Compiler" manifestLocation="" manifestVersion="1.0" reuseManifest="false" saveManifest="false" usesManifest="true">
+        <sealing sealJar="false">
+            <packagesToSeal/>
+            <packagesToUnSeal/>
+        </sealing>
+    </manifest>
+    <selectedElements exportClassFiles="true" exportJavaFiles="false" exportOutputFolder="false">
+        <file path="/nds/.hgtags"/>
+        <folder path="/nds/lib"/>
+        <file path="/nds/.classpath"/>
+        <javaElement handleIdentifier="=InsenseCompilerInceOS/&lt;uk.ac.stand.cs.insense.compiler.incesosCCgen.fileHandling"/>
+        <file path="/nds/.project"/>
+        <javaElement handleIdentifier="=InsenseCompilerInceOS/&lt;uk.ac.stand.cs.insense.compiler.incesosCCgen"/>
+        <file path="/nds/.hgignore"/>
+        <file path="/InsenseCompilerInceOS/.cvsignore"/>
+        <javaElement handleIdentifier="=InsenseCompilerInceOS/&lt;uk.ac.stand.cs.insense.compiler.symbols"/>
+        <file path="/InsenseCompilerInceOS/.classpath"/>
+        <file path="/nds/GPL.txt"/>
+        <javaElement handleIdentifier="=InsenseCompilerInceOS/&lt;uk.ac.stand.cs.insense.compiler.types"/>
+        <javaElement handleIdentifier="=InsenseCompilerInceOS/&lt;uk.ac.stand.cs.insense.compiler.test"/>
+        <javaElement handleIdentifier="=nds/src"/>
+        <file path="/nds/build-hudson.xml"/>
+        <javaElement handleIdentifier="=InsenseCompilerInceOS/&lt;uk.ac.stand.cs.insense.compiler"/>
+        <javaElement handleIdentifier="=InsenseCompilerInceOS/&lt;uk.ac.stand.cs.insense.compiler.interfaces"/>
+        <javaElement handleIdentifier="=InsenseCompilerInceOS/&lt;uk.ac.stand.cs.insense.compiler.cgen"/>
+        <file path="/InsenseCompilerInceOS/.designRoot"/>
+    </selectedElements>
+</jardesc>

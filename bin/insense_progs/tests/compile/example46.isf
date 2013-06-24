@@ -1,0 +1,21 @@
+type inyerface is interface( out string output )
+
+component MyComp presents inyerface {
+	
+	constructor() {
+	}
+	
+	
+	behaviour {
+		a = 4
+		b = 2.5
+		c = a + b
+		d = b + a
+	}
+}
+
+
+
+
+
+

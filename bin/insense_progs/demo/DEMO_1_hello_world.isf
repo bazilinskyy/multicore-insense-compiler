@@ -1,0 +1,49 @@
+// Simple Hello World Insense program
+
+// Interface for Hello component
+type IHello is interface ()
+
+// Hello World component
+component Hello presents IHello {
+
+	count = 1
+	msg = ""
+
+	constructor() {	
+	}
+		
+	constructor(string mesg) {
+	   msg := mesg
+	}
+		
+	behaviour {
+		var = 0;
+		printString("\nHello World ")
+		printInt(count)
+		count := count + 1
+	}
+} 
+
+// Hello World component
+component Hello2 presents IHello {
+
+	count = 1
+	msg = ""
+
+	constructor() {	
+	}
+		
+	constructor(string mesg) {
+	   msg := mesg
+	}
+		
+	behaviour {
+		var = 0;
+		printString("\nThread 2: ")
+		printInt(count)
+		count := count + 1
+	}
+} 
+
+hello = new Hello()
+hello2 = new Hello()

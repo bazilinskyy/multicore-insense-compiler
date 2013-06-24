@@ -1,0 +1,45 @@
+
+type ISender is interface( out integer[] output )
+type IReceiver is interface ( in integer[] input )
+	
+component Sender presents ISender {
+
+	last = 0
+	ints = new integer[5] of 0
+	
+	constructor(){
+	}
+	
+	behaviour {
+		for i = 0 .. ints.length-1 do {
+			ints[i] := last
+			last := last + 1
+		}
+		send ints on output
+	}
+}
+
+
+component Receiver presents IReceiver {
+
+	constructor() {
+	}
+	
+	behaviour {
+		receive ints from input
+		if ints.length > 0 then {
+			printInt(ints[0])
+		}
+		for i = 1 .. ints.length-1 do {
+			printString(", ")
+			printInt(ints[i])
+		}
+		printString(" received\n")
+	}
+}
+
+// Insense main
+
+s = new Sender()
+r = new Receiver()
+connect s.output to r.input

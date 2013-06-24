@@ -1,0 +1,57 @@
+	
+type IChanSender is interface( out out integer chanOut )
+type IChanReceiver is interface ( in out integer chanIn )
+	
+component ChanSender presents IChanSender {
+
+	dataOut = new out integer
+	dataIn = new in integer
+	sentChan = false
+	
+	constructor(){
+//      can't put this in the constructor as it causes deadlock
+//		connect dataOut to dataIn
+//	    send dataOut on chanOut
+	}
+	
+	behaviour {
+		if !sentChan then {
+		connect dataOut to dataIn
+	    send dataOut on chanOut
+		    sentChan := true
+		}
+		receive i from dataIn
+		printInt(i)
+		printString(" was received\n")
+	}
+}
+
+
+component ChanReceiver presents IChanReceiver {
+
+	dataOut = new out integer
+	count = 0
+	gotChan = false
+	
+	constructor() {
+//      can't put this in the constructor as it causes deadlock
+//		receive chan from chanIn
+//		dataOut := chan	
+	}
+	
+	behaviour {
+		if !gotChan then {
+			receive chan from chanIn
+			dataOut := chan	
+			gotChan := true
+		}
+		send count on dataOut
+		count := count + 1
+	}
+}
+
+// Insense main
+
+cs = new ChanSender()
+cr = new ChanReceiver()
+connect cs.chanOut to cr.chanIn

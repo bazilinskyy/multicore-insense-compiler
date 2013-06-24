@@ -1,0 +1,25 @@
+
+type sineI is interface(out bool tempReq ; in integer tempVal)
+
+component sine presents sineI {
+
+	state = true
+	constructor() {
+
+        }
+
+        behaviour {
+            send true on tempReq
+            receive temp from tempVal
+
+            printInt(temp);
+            setRedLedPower(state)
+            state := !state
+        }
+}
+
+
+s = new sine()
+
+connect s.tempReq to sensors.tempRequest
+connect s.tempVal to sensors.tempOut

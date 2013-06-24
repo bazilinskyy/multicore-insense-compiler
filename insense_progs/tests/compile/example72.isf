@@ -1,0 +1,35 @@
+// Tests components exporting multiple & unnamed interfaces
+
+type vision is interface( out integer piccies  )
+type sound is interface( out integer noise )
+
+component Radio presents sound {
+	
+	size = 0;
+	
+	constructor() {
+	}	
+	
+	behaviour {
+		
+	}
+}
+
+component Television presents sound,vision {
+	
+	size = 0;
+	
+	constructor() {
+	}	
+	
+	behaviour {
+		
+	}
+}
+
+
+tv = new Television()
+radio = new Radio()
+ 
+
+

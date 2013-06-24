@@ -1,0 +1,62 @@
+// A program consisting of a single Insense component requesting 
+// sensor readings from the sensors and printing out the sensor readings.
+
+// Interface for Light Sensor Reader
+type ISensorReader is interface ( in bool ticks )
+
+// Light Sensor Reader component
+component SensorReader presents ISensorReader {
+
+	// cycle counter
+	cycle = 0
+
+	// convert temperature integer as produced by sensor hardware to Celsius		
+	proc tempIntToCelsiusReal(integer reading) : real {
+		// this conversion was given in the contiki source
+		// convert integer reading to Celsius by: -39.60 + 0.01 * reading 
+		// but values appear to high, have calibrated to 
+				return -45.3 + 0.01 * reading
+	}
+		
+	// convert humidity integer as produced by sensor hardware to relative humidity
+	proc humidIntToRelHumidityReal(integer reading) : real {
+		return -4.60 + 0.0405 * reading  +  2.8e-6 * (reading * reading)
+	}
+
+	// print out all readings
+	proc printReading(integer photo, solar, temp, humid){
+		printString("It ")
+		printInt(cycle)
+		printString(": photo ")
+		printInt(photo)
+		printString(", solar ")
+		printInt(solar)
+		printString(", temp ")
+		printReal(tempIntToCelsiusReal(temp))
+		printString(", humid ")
+		printReal(humidIntToRelHumidityReal(humid))
+		printString("\n\r")
+		// increment cycle counter
+		cycle := cycle + 1
+	}
+	
+	constructor() {
+	}
+	
+	behaviour {
+		// wait for tick
+		receive tick from ticks
+		
+		// get readings for photo, solar, temp and humid
+		p = photoReading()
+		s = solarReading()
+		t = tempReading()
+		h = humidReading()
+		
+		// print readings to StdOut
+		printReading(p, s, t, h)
+	}
+} 
+
+sr = new SensorReader()
+setTimer(sr.ticks, 10.0, true)

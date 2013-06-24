@@ -1,0 +1,28 @@
+	
+type IBitops is interface( )
+	
+component Bitops presents IBitops {
+
+	constructor(){
+	}
+	
+	behaviour {
+		num = $32396
+		lowbyte = (num & $255)
+		invlow = lowbyte ^$255
+		invwhole = ~lowbyte
+		
+		printUnsignedInt(num)
+		printString(" : ")
+		printUnsignedInt(lowbyte)
+		printString(" : ")
+		printUnsignedInt(invlow)
+		printString(" : ")
+		printUnsignedInt(invwhole)
+		printString("\n")
+	}
+}
+
+// Insense main
+
+bitops = new Bitops()

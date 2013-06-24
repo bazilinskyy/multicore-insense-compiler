@@ -1,0 +1,30 @@
+// Tests match, receive etc. in simple real example
+type mySpecialLittleInterface is interface( out string trace )
+
+component Receiver presents mySpecialLittleInterface {
+
+	p = 0
+	q = 1
+	a = 2
+	
+	constructor() {
+		p := 66
+	}
+	
+	
+	behaviour {
+		if a > 3 then 
+			a := 6
+		else
+			a := 8
+			
+		p = 4
+		q = 7
+	}
+}
+
+r = new Receiver()
+disconnect r.trace
+
+
+

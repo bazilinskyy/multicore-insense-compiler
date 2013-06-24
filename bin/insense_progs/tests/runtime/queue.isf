@@ -1,0 +1,118 @@
+// Simple (circular) queue example in Insense
+
+// Simulates asynchronous communication between 
+// sender and receiver over synchronous channels
+// (with caveat of fixed size queue)
+
+
+type ISender is interface ( out integer output )
+
+component Sender presents ISender  {
+		
+	count = 0
+	
+	constructor(){
+	}
+	
+	behaviour {
+		printAny(any("\nS: sending "))
+		printAny(any(count))
+		send count on output
+		count := count + 1
+	}
+}
+
+
+type IQueue is interface (
+	in integer enqValue ; 
+	in bool deqRequest ; 
+	out integer deqValue
+)
+
+component Queue presents IQueue {
+	
+	buff = new integer[100] of 0
+	front = 0
+	back = 0
+	
+	proc getLength() : integer {
+		if back >= front then {
+			return back - front
+		} else {
+			return buff.length - (front - back - 1)
+		}
+	}
+	
+	proc enq(integer i){
+		if back == buff.length and front > 0 then {
+			back := 0
+		} 
+		if getLength() < buff.length then {
+			buff[back] := i
+			back := back + 1
+		}
+		// cannot expand the queue and don't want to block sender
+		// so value is thrown away if the queue is full
+	}
+	
+	proc deq(): integer {
+		if front == buff.length and back > 0 then {
+			front := 0
+		} 
+		result = 0 // is returned when queue is empty
+		if getLength() > 0 then {
+			result := buff[front]
+			front := front + 1
+		}
+		return result
+	}
+	
+	
+	constructor(){
+	}
+	
+	behaviour {
+		select {
+			receive request from deqRequest : {
+				result = deq()
+				printAny(any("\n  Q: deq "))
+				printAny(any(result))				
+				send result on deqValue
+			}
+			receive value from enqValue : {
+				printAny(any("\n Q: enq "))
+				printAny(any(value))				
+				enq(value)
+			}
+		}
+	}
+	
+	
+}
+
+
+type IReceiver is interface ( out bool request ; in integer input )
+
+component Receiver presents IReceiver {
+		
+	
+	constructor(){
+	}
+	
+	behaviour {
+		send true on request
+		receive value from input
+		printAny(any("\n   R: got "))
+		printAny(any(value))
+	}
+}
+
+
+sender = new Sender()
+receiver = new Receiver()
+queue = new Queue()
+
+connect sender.output to queue.enqValue
+connect receiver.request to queue.deqRequest
+connect receiver.input to queue.deqValue
+

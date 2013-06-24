@@ -1,0 +1,21 @@
+// Tests if then else
+type interfaceName is interface(out integer null)
+
+component IfTEst presents interfaceName {
+	
+	 x = 0;
+	
+	constructor() {
+	}
+	
+	behaviour {
+		if x > 0 then
+			x := 7
+		else 
+			x := 3;
+	}
+}
+
+
+
+

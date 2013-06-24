@@ -1,0 +1,15 @@
+type chanchan is interface( out out bool chan)
+								
+component TempRouter presents chanchan {
+
+	x = new out bool
+	
+	constructor() {
+	}
+
+	behaviour {
+		send true on x
+		send x on chan
+		
+	}
+}

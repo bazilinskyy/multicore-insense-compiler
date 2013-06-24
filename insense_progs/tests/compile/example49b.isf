@@ -1,0 +1,16 @@
+// * Do we really need this null interface?
+// * Radio uses a byte array, we only want to receive receive a byte
+// * We need to send an int on the leds. Can we change from byte to int?
+
+type myInterface is interface(out integer nullInterface)
+component Receiver presents myInterface {	
+	constructor() {
+	}
+	
+	behaviour {
+		//byteValue = receive from radioIn
+		//intValue = 0 + byteValue[0]
+		//x = {intValue};
+		//send x on leds
+	}
+}

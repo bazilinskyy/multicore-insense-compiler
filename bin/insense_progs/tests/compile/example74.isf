@@ -1,0 +1,46 @@
+// Tests components exporting multiple & unnamed interfaces
+
+type doubletype is proc(integer) : integer
+type fun is interface( out doubletype f1 )
+type sadness is interface( in doubletype f1 )
+
+component X presents fun {
+	
+	size = 0;
+	
+	proc double (integer x): integer {
+		return x + size
+	} 
+	
+	constructor() {
+	}	
+	
+	behaviour {
+		fn = double
+		send double on f1
+	}
+}
+
+
+component Y presents sadness {
+
+	constructor() {
+	}
+	
+	behaviour {
+		receive double from f1
+		x = double(2)
+		p = double		// function alias
+		y = double(x+1)
+	}
+}
+
+x = new X()
+y = new Y()
+connect x.f1 to y.f1
+
+
+
+ 
+
+

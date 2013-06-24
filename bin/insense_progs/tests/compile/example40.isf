@@ -1,0 +1,8 @@
+// Tests for lack of constructor (error case)
+
+type foo is interface( in integer ticks )
+
+component MyComponent presents foo {
+	size = 0
+	
+}

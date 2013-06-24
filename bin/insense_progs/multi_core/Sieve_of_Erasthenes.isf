@@ -1,0 +1,157 @@
+/*
+ * Insense implementation of the sieve of Erasthenes. Children instantiate copies
+ * of themselves, isn't possible at present in Insense. Hence, current implementation
+ * does not work. 2 different versions were built.
+ *
+ *
+ * Copyright (c) 2013, Pavlo Bazilinskyy <pavlo.bazilinskyy@gmail.com>
+ * School of Computer Science, St. Andrews University
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+
+// 1ST VERSION
+
+/* type IComp is interface( in integer input; out integer output )
+type IFirstComp is interface( out integer output )
+
+proc printMessageAndNumber(integer id; string msg; integer number){
+	printString(msg)
+	printString(msg)
+	printInt(number)
+	printString("\n")
+}
+
+// Find prime numbers that are less than or equal to limit
+// limit = 30
+
+component Comp presents IComp {
+
+	i = 1
+
+	proc makeChild(integer id){
+
+	}
+	constructor(integer id){
+		componentId := id
+	}
+
+	behaviour {
+		receive number from input
+
+		// First check if the upper limit for generating prime numbers has been reached.
+		if (componentId == 30 ) then {
+			printString("Prime: ")
+			printInt(number)
+			printString("\n")
+		} else {
+
+			printMessageAndNumber(componentId, ": got value ", number)
+
+			// Check if received number is a multiple of the integer that corresponds to the ID given to the component
+			if (number % componentId != 0) then {
+				if (number == componentId + 1) then {
+					comp = new Comp(componentId + 1)
+					connect this.output to comp.input
+				}		
+				send number * i on output
+				i = i + 1
+			} else {
+				printMessageAndNumber("R: got value ", number)
+			}
+
+		}
+	}
+}
+
+component FirstComp presents IFirstComp {
+
+	number = 2
+
+	constructor(){
+	}
+
+	behaviour {
+		if (number <= 30) then { // Only generate numbers till a predefined limit.
+			printMessageAndNumber(1, ": sending value ", number)
+			send number on output	
+			number := number + number
+		} else {
+			stop
+		}
+	}
+}
+
+//Insense main
+c1 = new FirstComp()
+c2 = new Comp(2)
+connect this.output to comp.input */
+
+// 2ND VERSION
+
+type IParent is interface( out integer output )
+type IChild is interface( in integer input ; out integer output)
+
+component Parent presents IParent {
+
+	number = 2
+
+	constructor(){
+	}
+
+	behaviour {
+		send number on output
+		number := number + 1
+		}
+}
+
+
+component Child presents IChild {
+
+	prime = 0
+
+	constructor(out integer parent){
+		connect parent to input
+		receive number from input // get first number from parent
+		prime := number           // first number assumed to be prime
+	}
+
+	behaviour {
+		receive number from input     // for every subsequent number from parent
+		if number % prime != 0 then { // if it is not a multiple of this child's prime 
+			send number on output     // send it on to its own child
+		}
+	}
+
+}
+
+
+//Insense main
+
+parent = new Parent()
+child1 = new Child(parent.output)
+child2 = new Child(child1.output)
+child3 = new Child(child2.output)
+child4 = new Child(child3.output)
+child5 = new Child(child4.output)
+child6 = new Child(child5.output)
+child7 = new Child(child6.output)
+child8 = new Child(child7.output)
+child9 = new Child(child8.output)
+child10 = new Child(child9.output)

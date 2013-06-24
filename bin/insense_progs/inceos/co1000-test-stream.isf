@@ -1,0 +1,103 @@
+/*
+ * Test program for the co1000 sensor board
+ */ 
+ 
+
+type Ico1000Stream is interface( 	out streamReq axReq  ; in integer[] axVal ;
+									out streamReq ayReq  ; in integer[] ayVal ;
+									out streamReq txReq  ; in integer[] txVal ;
+									out streamReq tyReq  ; in integer[] tyVal )
+
+	
+component co1000Stream presents Ico1000Stream {
+	
+	period    = 2000
+	count 	  = 0
+
+	//An array for each stream
+	accelXArray = new integer[10] of 0
+	accelYArray = new integer[10] of 0
+	tiltXArray  = new integer[10] of 0
+	tiltYArray  = new integer[10] of 0
+	
+	//The pre stream request to be sent to each component
+	accelx = new streamReq(period, accelXArray)
+	accely = new streamReq(period, accelYArray)
+	tiltx  = new streamReq(period, tiltXArray)
+	tilty  = new streamReq(period, tiltYArray)
+
+	constructor(){
+	}
+	
+	behaviour {
+		
+		printString("start\n")
+
+		/*
+		* using the stream sensors, collect buffer of sensor readings
+		*/
+		send  accelx on axReq
+		send  accely on ayReq
+		send  tiltx  on txReq
+		send  tilty  on tyReq
+		
+		receive ax from axVal
+		receive ay from ayVal
+		receive tx from txVal
+		receive ty from tyVal
+		
+		/*
+		* Now write these values to flash
+		*
+		* impl issue: actual space consumption is double the offset specified
+		*/ 
+		
+		
+		
+		
+		
+
+		/*
+		for i = 1 .. ax.length-1 do {
+			printString(", ")
+			printInt(ax[i])
+		}
+		printString("\n")
+	
+		for i = 1 .. ay.length-1 do {
+			printString(", ")
+			printInt(ay[i])
+		}
+		printString("\n")
+		
+		for i = 1 .. tx.length-1 do {
+			printString(", ")
+			printInt(tx[i])
+		}
+		printString("\n")
+		
+		for i = 1 .. ty.length-1 do {
+			printString(", ")
+			printInt(ty[i])
+		}
+		*/
+
+		printString("\n*******\n")
+		//count := count + 1
+		printInt(count)
+		printString(" stop\n")
+	}
+}
+/******************************************************************************/
+c = new co1000Stream()
+
+connect c.axReq  to accelxSensor.request
+connect c.ayReq  to accelySensor.request
+connect c.txReq  to tiltxSensor.request
+connect c.tyReq  to tiltySensor.request
+
+connect c.axVal  to accelxSensor.val
+connect c.ayVal  to accelySensor.val
+connect c.txVal  to tiltxSensor.val
+connect c.tyVal  to tiltySensor.val
+

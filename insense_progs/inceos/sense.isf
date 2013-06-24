@@ -1,0 +1,35 @@
+/*
+* periodically sample the temp sensor and display the bottom 3 bits on the leds
+*/
+
+type senseI is interface (in bool timerRecv ; out bool tempReq ; in integer tempVal)
+
+component sense presents senseI {
+
+
+    constructor(real time){
+    	setTimer(timerRecv , time , true)
+    }
+
+    behaviour {
+
+        
+        receive tick from timerRecv
+
+        send true on tempReq
+        receive reading from tempVal
+
+        if (reading & 4) == 4 then setRedLedPower(true)
+        else setRedLedPower(false)
+        if (reading & 2) == 2 then setBlueLedPower(true)
+        else setBlueLedPower(false)
+        if (reading & 1) == 1 then setGreenLedPower(true)
+        else setGreenLedPower(false)
+    }
+}
+
+
+s =  new sense(0.1)
+
+connect s.tempReq   to sensors.tempRequest
+connect s.tempVal to sensors.tempOut

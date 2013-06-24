@@ -1,0 +1,43 @@
+Acknowledge           Not in InceOS at present
+AnyConstructor
+AnyProject
+ArrayConstructor
+ArrayDereference
+Assign
+Behaviour
+BinaryOp              TODO in ???
+CompilationUnit       
+Component             
+ComponentDereference  N/A
+Conditional           N/A
+Connect               Paul for channel_bind
+Constructor           
+ConstructorCall
+Decl
+DeclarationContainer
+Dereference
+Disconnect           Paul for channel_unbind
+EnumDeclaration
+ExceptionBlock
+ForLoop
+Function
+Location
+LocationUsage
+Makefile
+ProcCall
+ProcedureContainer
+Publish
+Receive              Paul
+Return
+Select               Paul
+Send                 Paul
+Sequence
+SpaceTracker
+Statement
+Stop
+StructConstructor
+StructDeclaration
+StructDereference
+Switch               We have this?
+Throw
+UnionDeclaration

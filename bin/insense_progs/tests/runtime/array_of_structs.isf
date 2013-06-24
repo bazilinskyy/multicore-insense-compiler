@@ -1,0 +1,86 @@
+// array of structs test program
+
+type reading is struct (integer cycle ; integer photo ; integer solar)
+
+// Interface for Sensor Reader
+type sensorReader is interface (out bool photoRequestChan ; in integer photoValueChan ; 
+								out bool solarRequestChan ; in integer solarValueChan ; 
+								out reading[] printerChan)
+
+// Sensor reader component
+component SensorReader presents sensorReader {
+
+	dummy = new reading(0,0,0)
+	readings = new reading[5] of dummy
+	cycle = 0
+	
+	constructor() {	
+
+	}
+		
+	behaviour {
+		// get photo sensor reading
+		send true on photoRequestChan
+		receive photoValue from photoValueChan 
+		
+		// get solar sensor reading
+		send true on solarRequestChan
+		receive solarValue from solarValueChan 
+		
+		// put readings into struct and into array
+		newReading = new reading(cycle, photoValue, solarValue)
+		if cycle < readings.length then {
+			readings[cycle] := newReading
+			cycle := cycle + 1
+		}
+		else {
+			send readings on printerChan
+			cycle := 0
+		}
+		
+	}
+} 
+
+
+// Interface for standard output printer
+type printOutput is interface ( in reading[] input ; 
+								out any output )
+
+// Standard output printer component
+component PrintOutput presents printOutput {
+	lcycle = 0
+	reading = new reading(0,0,0)
+	constructor() {	
+	}
+		
+	behaviour {
+		// get reading struct
+		receive readings from input
+		//for i = 0 .. readings.length - 1 do {
+		for i = 1 .. readings.length do {
+			//reading := readings[i]
+   			reading := readings[i-1]
+			// send text+readings in struct on stdout
+			send (any("\nCycle ")) on output
+			send (any(lcycle)) on output
+			send(any("-")) on output
+			send (any(reading.cycle)) on output
+			send (any(":\tphoto = ")) on output
+			send (any(reading.photo+1)) on output
+			send (any("\tsolar = ")) on output
+			send (any(reading.solar)) on output
+		}
+		lcycle := lcycle + 1
+	}
+} 
+
+
+po = new PrintOutput()
+sr = new SensorReader()
+
+connect sr.photoRequestChan to photoSensor.request
+connect sr.photoValueChan to photoSensor.output
+connect sr.solarRequestChan to solarSensor.request
+connect sr.solarValueChan to solarSensor.output
+connect sr.printerChan to po.input
+connect po.output to standardOut

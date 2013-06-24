@@ -1,0 +1,24 @@
+	
+type IProg is interface( in bool ticks )
+	
+component Prog presents IProg {
+
+	args = ""
+	
+	constructor(){
+		args := getString()
+	}
+	
+	behaviour {
+		receive tick from ticks
+		printString("running with args == ")
+		printString(args)
+		printString("\n")
+	}
+}
+
+// Insense main
+
+prog = new Prog()
+setTimer(prog.ticks, 10.0, true)
+

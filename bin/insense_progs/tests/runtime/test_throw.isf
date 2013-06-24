@@ -1,0 +1,36 @@
+// Simple example showing how to use testing syntax "throw OperationFailedException" in procedures
+
+type IEmpty is interface ( )
+
+component Tester presents IEmpty {
+		
+	proc divide(real numerator, denominator) : real {
+		if denominator == 0.0 then
+			throw OperationFailedException
+		return numerator/denominator
+	}
+	
+	proc test(real a, b){
+		try{
+			printAny(any(divide(a,b)))
+			printAny(any("\n"))
+		} except OperationFailedException {
+			printAny(any("test: caught exception\n"))
+		}
+		printAny(any(divide(a,b)))
+		printAny(any("\n"))
+	}
+	
+	constructor(){}
+	
+	behaviour {
+		test(3.0, 2.0)
+		test(3.0, 0.0)
+		stop
+	}
+}
+
+tester = new Tester()
+
+
+

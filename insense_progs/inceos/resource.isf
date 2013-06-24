@@ -1,0 +1,112 @@
+/*
+ * Resource access control with Insense components
+ *
+ * This application is used to test the use of Shared Resources.
+ * Three Resource users are created and all three request
+ * control of the resource before any one of them is granted it.
+ * Once the first user is granted control of the resource, it performs
+ * some operation on it.  Once this operation has completed, a timer
+ * is set to allow this user to have control of it for a specific
+ * amount of time.  Once this timer expires, the resource is released
+ * and then immediately requested again.  Upon releasing the resource
+ * control will be granted to the next user that has requested it in
+ * round robin order.  Initial requests are made by the three resource
+ * users in the following order.
+ * -- Resource 0
+ * -- Resource 2
+ * -- Resource 1
+ * It is expected then that using a round robin policy, control of the
+ * resource will be granted in the order of 0,1,2 and the Leds
+ * corresponding to each resource will flash whenever this occurs.
+ *   -- Led 0 -> Resource 0
+ *   -- Led 1 -> Resource 1
+ *   -- Led 2 -> Resource 2
+ *
+ */
+
+
+type ledType is enum (red, green, blue, other)
+/*
+ * Resource access component
+ */
+
+type controlI is interface(in bool reqChan ; in bool releaseChan ; out bool accessChan)
+
+component control presents controlI {
+
+    constructor() {
+
+    }
+
+    behaviour {
+        receive request from reqChan
+        send true on accessChan
+
+        receive release from releaseChan
+    }
+}
+
+/*----------------------------------------------------------------------------*/
+type nodeI is interface(out bool request ; in bool access ; in bool timerChan ; out bool release)
+
+component node presents nodeI {
+
+    state = true
+    led = other
+
+
+    constructor(ledType l) {
+
+        led := l
+
+    }
+
+    behaviour {
+
+        send true on request
+        receive result from access
+
+        setTimer(timerChan , 0.25 , true)
+
+        if (led == red) then{
+                setRedLedPower(state)
+        }
+
+        if (led == green) then{
+                setGreenLedPower(state)
+        }
+
+        if (led == blue) then{
+                setBlueLedPower(state)
+        }
+
+        state := !state
+
+        receive timeOut from timerChan
+        send true on release
+    }
+}
+
+/******************************************************************************/
+c = new control()
+        
+/*----------------------------------------------------------------------------*/
+r = new node(red)
+
+connect r.request to c.reqChan
+connect r.access  to c.accessChan
+connect r.release to c.releaseChan
+/*----------------------------------------------------------------------------*/
+g = new node(green)
+
+connect g.request to c.reqChan
+connect g.access  to c.accessChan
+connect g.release to c.releaseChan
+/*----------------------------------------------------------------------------*/
+b = new node(blue)
+
+connect b.request to c.reqChan
+connect b.access  to c.accessChan
+connect b.release to c.releaseChan
+
+

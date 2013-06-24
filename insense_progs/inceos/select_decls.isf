@@ -1,0 +1,21 @@
+// Simple example of 3 senders and a single selector printing out
+// the received values to standard output that has type interface ( in any input )
+
+
+type ISelector is interface( in integer ticker )
+
+
+component Selector presents ISelector {
+	
+	constructor() {
+	}
+	
+	behaviour {
+		p = select {
+		    receive x from ticker : { y = 2 ; y }
+		    default: { z = 3 ; 3 }
+		}
+	}
+}
+
+sel = new Selector()

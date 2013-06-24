@@ -1,0 +1,129 @@
+/*
+Base station for the River cats experiment
+
+The user will send string commands over the serial interface, this component
+processes these are interacts with the remote component over the radio
+
+Paul Harvey
+*/
+
+/*--------------------------------------------------------------------------*/
+type msgType is enum (s, h, p, sp, e, d, sd, hd, pd, spd, ed, dd)
+ type nodeReplyMsg is struct(msgType class ; unsigned value)
+/*--------------------------------------------------------------------------*/
+proc createRadioPacket (unsigned dest ; msgType payload ) : RadioPacket {
+ 
+		p = new RadioPacket(dest , any(payload))
+		return p
+}
+/*--------------------------------------------------------------------------*/
+proc processMoteMessage(RadioPacket packet) {
+	
+}
+/*--------------------------------------------------------------------------*/
+type Ibase is interface( out any bcast ; out RadioPacket ucast ; in string pc ; in RadioPacket ether)
+
+component base presents Ibase {
+	
+	problemSolver = new integer[1] of 1
+	constructor() {}
+	
+	behaviour {
+		select {
+			//got a command over the serial line
+			receive message from pc      : {
+				printString("got serial message ")
+				printString(message)
+				printString("\n")
+				
+				if stringStartsWith(message , "start") then {
+					send createRadioPacket(charAt(message, $6), s) on ucast
+				}
+		
+				else if stringStartsWith(message , "halt") then {
+					send createRadioPacket(charAt(message, $5), h) on ucast
+				}
+					
+				else if stringStartsWith(message , "ping") then {
+					send any(p) on bcast
+				}
+				
+				else if stringStartsWith(message , "space") then {
+					send createRadioPacket(charAt(message, $6), sp) on ucast
+				}
+			
+				else if stringStartsWith(message , "erase") then {
+					send createRadioPacket(charAt(message, $6), e) on ucast
+				}
+				
+				else if stringStartsWith(message , "dump") then {
+					send createRadioPacket(charAt(message, $5), d) on ucast
+				}
+			}
+			//got a reply from a node
+			receive packet from ether   : {
+				project packet.payload as message onto
+					nodeReplyMsg : {
+						if message.class == sd then {
+							printString("Reply from started node ")
+							printUnsignedInt(packet.addr)
+							printString("\n")
+						}
+						
+						// stop message: stop logging
+						if message.class == hd then {
+							printString("Reply from stopped node ")
+							printUnsignedInt(packet.addr)
+							printString("\n")
+						}
+										
+						//ping message: reply with ID
+						if message.class == pd then {
+							printString("Reply to ping from node ")
+							printUnsignedInt(packet.addr)
+							printString("\n")
+						}
+						
+						//available flash space message: how much data have we stored
+						if message.class == spd then {
+							printString("Node ")
+							printUnsignedInt(packet.addr)
+							printString("has ")
+							printUnsignedInt(message.value)
+							printString(" bytes of space\n")
+						}
+						
+						//clear flash message: erase all stored data (there should be a counter for this in storage.c)
+						if message.class == ed then {
+							printString("Reply from erased node ")
+							printUnsignedInt(packet.addr)
+							printString("\n")
+						}
+						
+						//dump message: send all stored data to base
+						if message.class == dd then {
+							printString("DumpDone from  node ")
+							printUnsignedInt(packet.addr)
+							printString("\n")
+						}
+					}
+					integer[] : {
+						for i = 0 .. message.length-1 do {
+							printInt(message[i])
+							printString("\n")
+						}
+						
+						
+					}
+					default : { printString("unknown packet\n")}
+			}
+		}
+	}
+}
+/*--------------------------------------------------------------------------*/
+b = new base()
+
+connect b.pc      to serial.incoming
+connect b.ucast   to radio.unicastSend
+connect b.bcast   to radio.broadcastSend
+connect b.ether   to radio.received

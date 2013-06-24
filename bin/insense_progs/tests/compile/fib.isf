@@ -1,0 +1,42 @@
+
+
+type IFib is interface( in integer fibs ; out integer nextFib )
+
+component Fibonacci presents IFib {
+
+	n = 1
+	nminus1 = 1
+	
+	constructor(){
+	}
+	
+	behaviour {
+		send n + nminus1 on nextFib
+		receive anint from fibs
+		nminus1 := n
+		n := anint
+	}
+}
+
+type TJunction is interface( in integer input ; out integer out1 ; out any out2 )
+
+component Splitter presents TJunction {
+	constructor(){
+	}
+	
+	behaviour {
+		receive someval from input
+		send someval on out1
+		send any( someval ) on out2
+	}
+}
+
+fib = new Fibonacci()
+split = new Splitter()
+connect split.out1 to fib.fibs
+connect fib.nextFib to split.input
+connect split.out2 to standardOut
+
+
+
+

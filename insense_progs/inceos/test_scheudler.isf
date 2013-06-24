@@ -1,0 +1,50 @@
+type spinI is interface()
+
+
+type ledType is enum (red, green, blue, other)
+
+        
+component spinner presents spinI {
+
+
+    led = other
+    loopLen = 0
+    state = true
+
+    constuctor(ledType l ; integer loop ) {
+        led := l
+        loopLen := loop
+    }
+
+
+    behaviour {
+
+        for i = 0 .. loopLen do {
+            for j = 0 .. 10000 do {
+
+            }
+        }
+
+
+        if led == red then
+            setRedLedPower(state)
+
+        if led == green then
+            setGreenLedPower(state)
+
+        if led == blue then
+            setBlueLedPower(state)
+
+       state := !state
+
+    }
+}
+
+
+
+
+/*****************************************/
+
+a = new spinner(red, 50)
+b = new spinner(green, 25)
+c = new spinner(blue, 5)

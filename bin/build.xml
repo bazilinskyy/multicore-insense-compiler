@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="insense" basedir="." default="jar" >
+    <property name="nds.location" value="../nds"/>
+	
+	<path id="nds.classpath">
+		<pathelement location="${nds.location}/."/>
+		<pathelement location="${nds.location}/lib/mindterm.jar"/>
+		<path refid="JUnit 4.libraryclasspath"/>
+	</path>
+	
+	<target name="build-subprojects">
+		<ant antfile="${nds.location}/build.xml" inheritAll="false" target="build-project">
+			<propertyset>
+				<propertyref name="build.compiler"/>
+			</propertyset>
+		</ant>
+	</target>
+			
+    <target name="jar" description="Builds a JAR file" depends="build-subprojects">
+        <jar jarfile="Compiler.jar">
+    		<fileset dir="bin" excludes="CVS" />
+        	<fileset dir="${nds.location}" includes="**/util/*.class" />
+    	</jar>
+	</target>
+</project>

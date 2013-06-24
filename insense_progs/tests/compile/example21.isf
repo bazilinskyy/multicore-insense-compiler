@@ -1,0 +1,18 @@
+// Tests channel selection from components
+
+type foo is interface( in integer ticker )
+
+component Radio presents foo {
+	
+	constructor() {
+	}
+	
+	behaviour {
+		
+	}
+}
+
+a = new Radio();
+x = a.ticker;
+
+

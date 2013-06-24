@@ -1,0 +1,74 @@
+type LogRecord is struct(integer trigger ; string description ; real value)
+
+type t1 is interface (out integer output)
+type t2 is interface (in integer triggerChan ; out LogRecord logChan)
+type t3 is interface (in LogRecord input)
+
+// Trigger component
+component Trigger presents t1 {
+	
+	cycle = 1
+	
+	constructor(){}
+	
+	behaviour{
+		send cycle on output
+		cycle := cycle + 1
+	}	
+}
+
+// Reader component
+component Reader presents t2 {
+
+	description = ""
+	requestChan = new out bool
+	valueChan = new in real 
+		
+	constructor(in bool req ; out real val ; string desc) {
+		connect requestChan to req
+		connect valueChan to val
+		description := desc
+	}
+		
+	behaviour {
+		receive trigger from triggerChan
+		send true on requestChan
+		receive value from valueChan
+		record = new LogRecord(trigger, description, value)		
+		send record on logChan
+	}
+} 
+
+// Logger component
+component Logger presents t3 {
+
+	output = new out any
+	
+	proc outputRecord(LogRecord record){
+		send (any("\n")) on output // here
+		send (any(record.trigger)) on output
+		send (any("\t")) on output
+		send (any(record.description)) on output
+		send (any(": ")) on output
+		send (any(record.value)) on output
+	}
+	
+	constructor(in any input) {	
+		connect output to input
+	}
+		
+	behaviour {
+		receive record from input
+		outputRecord(record)
+	}
+} 
+
+trigger = new Trigger()
+tempReader = new Reader(lightHumidTempSensor.tempRequest, lightHumidTempSensor.tempOutput, "Temp")
+humidReader = new Reader(lightHumidTempSensor.humidRequest, lightHumidTempSensor.humidOutput, "Humid")
+logger = new Logger(standardOut)
+
+connect trigger.output to tempReader.triggerChan
+connect trigger.output to humidReader.triggerChan
+connect tempReader.logChan to logger.input
+connect humidReader.logChan to logger.input

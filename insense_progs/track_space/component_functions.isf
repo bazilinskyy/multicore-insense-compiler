@@ -1,0 +1,56 @@
+
+// TODO JL Space Tracking Issue
+// given var = f(3)
+// 'f(3)' proc call completes prior to 'var =' decl
+// as a result, stack usage due to 'var' is only added after proc call
+
+type IComponent is interface ( in any input ) 
+
+component Comp presents IComponent {
+
+	x = 0
+	y = 0
+	
+	proc sum2int(integer a, b) : integer {
+		return a + b
+	}
+
+	proc sum3int(integer a, b, c) : integer {
+		return a + sum2int(b,c)
+	}
+
+	proc sum3int2(integer a, b, c) : integer {
+		bc = sum2int(b,c)
+		return a + bc
+	}
+	
+	proc sum3int3(integer a, b, c) : integer {
+		bc = 0
+		bc := sum2int(b,c)
+		return a + bc
+	}
+	
+	constructor() {
+		a = 2
+		b = 4
+		//str = "hello"
+	}
+	
+	constructor(integer a, b){
+		x := a
+		y := b 
+	}
+	
+	behaviour {
+		a = -2
+		b = 4
+		c = 6
+		//d = absInt(a)
+		//sum = sum2int(a,b)
+		sum = sum3int(a, b, c)
+	}
+	
+}
+
+//a = 2
+comp = new Comp()

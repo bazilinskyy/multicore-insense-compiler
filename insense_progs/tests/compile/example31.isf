@@ -1,0 +1,40 @@
+// Tests match, receive etc. in simple real example
+
+type stream1 is interface( in integer input; in string input2 )
+type stream2 is interface( in integer input3 )
+type stream3 is interface( out integer output; out string output2)
+
+component Test presents stream1, stream2 { // cant use the name input in both - problem?
+	constructor() {
+	}
+	
+	behaviour {
+		 receive afoo from input
+		 receive abar from input2
+		 receive abarbar from input3
+	}
+}
+
+component Rest presents stream3 {
+	constructor() {
+	}
+	
+	
+	behaviour {
+	    food = 5
+	    good = "five"
+	    
+		send food on output
+		send good on output2
+	}
+} 
+
+t = new Test()
+r = new Rest()
+
+connect t.input to r.output
+
+
+
+
+

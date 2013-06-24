@@ -1,0 +1,90 @@
+/*
+ * This is an application to stress the creation of components
+ */
+type empty is interface()
+
+
+
+/*----------------------------------------------------------------------------*/
+component alpha presents empty {
+
+    count = 0
+    state = true
+    constructor() {
+
+    }
+
+    behaviour {
+
+        if(count == 0) then {
+            setRedLedPower(state)
+            state := !state
+        }
+        count := count + 1
+
+        a = new beta()
+        b = new gamma()
+        c = new alpha()
+
+        stop
+
+    }
+}
+/*----------------------------------------------------------------------------*/
+component beta presents empty {
+    count = 0
+    state = true
+    constructor() {
+    }
+
+    behaviour {
+        if(count == 0) then {
+            setGreenLedPower(state)
+            state := !state
+        }
+        count := count + 1
+
+        a = new gamma()
+        b = new alpha()
+        c = new beta()
+
+        stop
+    }
+}
+/*----------------------------------------------------------------------------*/
+component gamma presents empty {
+    count = 0
+    state = true
+    constructor() {
+    }
+
+    behaviour {
+        if(count == 0) then {
+            setBluePower(state)
+            state := !state
+        }
+        count := count + 1
+
+        a = new alpha()
+        b = new beta()
+        c = new gamma()
+
+        stop
+    }
+}
+/*----------------------------------------------------------------------------*/
+component main presents empty {
+
+    constructor() {
+
+    }
+
+    behaviour {
+        a = new alpha()
+        b = new beta()
+        c = new gamma()
+    }
+}
+/******************************************************************************/
+
+m = new main()

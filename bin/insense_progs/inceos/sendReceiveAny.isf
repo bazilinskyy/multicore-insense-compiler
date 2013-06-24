@@ -1,0 +1,43 @@
+
+type ISender is interface( out any output )
+type IReceiver is interface ( in any input )
+	
+component Sender presents ISender {
+
+	i = 0
+	r = 0.0
+	
+	constructor(){
+	}
+	
+	behaviour {
+		ai = any(i)
+		ar = any(r)
+		send ai on output
+		send ar on output
+		i := i + 1
+		r := r + 1.0
+	}
+}
+
+
+component Receiver presents IReceiver {
+
+	constructor() {
+	}
+	
+	behaviour {
+		receive something from input
+		project something as val onto
+			integer :  { printInt(val) }
+			real : { printReal(val) }
+			default : { printString("???") }
+		printString(" received\n")
+	}
+}
+
+// Insense main
+
+s = new Sender()
+r = new Receiver()
+connect s.output to r.input

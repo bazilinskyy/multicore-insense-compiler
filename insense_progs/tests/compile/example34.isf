@@ -1,0 +1,41 @@
+// Tests match, receive etc. in simple real example
+type inoutChannel is interface ( in string input )   //; out string trace )
+type outChannel is interface ( out string output )
+
+component Receiver presents inoutChannel {
+
+	a = 0
+	b = ""
+	
+	constructor() {
+		variable = 65
+	}
+	
+	behaviour {
+		x = 33
+		receive somedata from input
+		// send "OK" on trace
+	}
+}
+
+component Sender presents outChannel {
+	constructor() {	
+	}
+	
+	behaviour {
+		mytuple = "foobar"
+		send mytuple on output
+		
+	}
+} 
+
+s = new Sender()
+r = new Receiver()
+
+connect s.output to r.input
+// connect r.trace to standardOut
+
+
+
+
+

@@ -1,0 +1,579 @@
+/*
+Node 0 Query execution plan for simple join query with a buffering factor of 3
+
+Query logs the temperature in Rons and Als office when light is off
+
+SELECT RSTREAM Rons.temp, Als.temp
+FROM Rons[NOW], Als[NOW]
+where Rons.light < 100 
+and Als.light < 100;
+*/
+
+
+// Definitions of the tuple types 
+type RonsTuple is struct(integer evalEpoch; integer ronsId ; real ronsTemp)
+type AlsTuple is struct(integer evalEpoch; integer alsId ; real alsTemp)
+
+//tuple type for final aggregated value
+type JoinTuple is struct(integer evalEpoch; real ronsTemp, alsTemp)
+
+proc printRonsTuple(string s; RonsTuple t; out any chan){
+	send (any(s)) on chan
+	send (any(" tuple: (epoch=")) on chan
+	send (any(t.evalEpoch)) on chan
+	send (any(", id=")) on chan
+	send (any(t.ronsId)) on chan
+	send (any(", temp=")) on chan
+	send (any(t.ronsTemp)) on chan
+	send (any(")\n")) on chan
+}
+
+proc printAlsTuple(string s; AlsTuple t; out any chan){
+	send (any(s)) on chan
+	send (any(" tuple: (epoch=")) on chan
+	send (any(t.evalEpoch)) on chan
+	send (any(", id=")) on chan
+	send (any(t.alsId)) on chan
+	send (any(", temp=")) on chan
+	send (any(t.alsTemp)) on chan
+	send (any(")\n")) on chan
+}
+
+//proc printJoinTuple(string s; JoinTuple t; out any chan){
+//	send (any(s)) on chan
+//	send (any(" tuple: (epoch=")) on chan
+//	send (any(t.evalEpoch)) on chan
+//	send (any(", ronsTemp=")) on chan
+//	send (any(t.ronsTemp)) on chan
+//	send (any(", alsTemp=")) on chan
+//	send (any(t.alsTemp)) on chan
+//	send (any(")\n")) on chan
+//}
+
+//proc watchVar(string s; any var ; out any chan) {
+//	send (any(s)) on chan
+//	send (any("=")) on chan
+//	send (var) on chan
+//	send (any("\n")) on chan
+//}
+
+
+type IReceiver is interface(in RucRadioData radioChan ; out RonsTuple pushRonsTupleChan;
+	out AlsTuple pushAlsTupleChan ; out byte[] radioSetNodeAddress ; out any trace ); //
+
+
+component Receiver presents IReceiver {
+	
+	nodeAddr = new byte[2] of #0
+	firstRun = true	
+	
+	constructor(){
+		nodeAddr[0]:=#138
+		nodeAddr[1]:=#0
+	}
+	
+	behaviour{
+		if firstRun then {
+			send nodeAddr on radioSetNodeAddress
+			firstRun := false
+		}
+		receive radioPacket from radioChan
+		payload = radioPacket.payload
+		project payload as val onto
+			AlsTuple : {
+				alsTupleToSend = val 
+				//printAlsTuple("received packet containing", alsTupleToSend, trace)
+				send alsTupleToSend on pushAlsTupleChan
+				send any("RECEIVER: forwarded als tuple\n") on trace
+			}
+			RonsTuple : {
+				ronsTupleToSend = val
+				//printRonsTuple("received packet containing", ronsTupleToSend, trace)
+				//send any("received rons tuple\n") on trace
+				send ronsTupleToSend on pushRonsTupleChan
+				send any("RECEIVER: forwarded rons tuple\n") on trace
+			}  default : {
+			}
+	}
+}
+
+
+
+proc getBaseEpochPos (integer tupleBaseEpoch; integer minEpoch; integer bufferingFactor; 
+		integer minEpochPos; integer numAgendaEvalsToBuffer) : integer {
+	tupleBaseEpochPos = 
+		(((tupleBaseEpoch - minEpoch) / bufferingFactor) + minEpochPos) % numAgendaEvalsToBuffer
+	return tupleBaseEpochPos
+}	
+
+type IRonsBuffer is interface (in RonsTuple receiveTupleChan; out RonsTuple pushTupleChan); //  ; out any trace
+
+component RonsBuffer presents IRonsBuffer {
+
+	
+	/* Query-plan dependent constants*/
+	numAgendaEvalsToBuffer = 4						//inter-agenda evaluation buffering
+	bufferingFactor = 3								//intra-agenda evaluation buffering
+	streamMaxCardinality = 1						//the cardinality of the stream (per-epoch)
+	
+	dummyTuple = new RonsTuple(0, 0, 0.0)		    //just for padding purposes
+	
+	/* The main buffer which holds the tuples */
+	buffer = new RonsTuple[4][3][1] of dummyTuple;  //[x][y][z] where 
+													//x=agenda_evals_to_buffer (circular list)
+													//y=buffering factor 
+													//z=num sub-streams
+
+	minEpoch = 0   			// lowest epoch number of tuples in this buffer  
+	minEpochPos = 0			// the position of the minEpoch in the first dimension of buffer
+							// this is implemented as a circular list to avoid copying tuples
+
+	dataTupleCount = new integer[4][3] of 0  		// the number of result tuples containing data which have been
+													// received for an epoch.  Also denotes the position in the
+													// buffer array where next tuple for the epoch should be placed.
+
+	tupleBaseEpoch = -1			// the first epoch in the agenda evaluation that the tuple was acquired in
+	tupleEpochOffset = -1    	// the epoch number in the agenda evaluation that the tuple was acquired in
+	tupleBaseEpochPos = -1		// the position in the circular list which corresponds to this tupleBaseEpoch
+	
+	/* Sends tuples for buffer for particular epoch identified by baseEpochPos and epochOffset.
+	 * If a nullTuple or missingTuple notification is received, this is forwarded.
+	 * If not all tuples have been accounted for, a MissingTuple notification is generated.
+	 */
+	proc ronsSendEpochTuplesFromBuffer(integer baseEpochPos ; integer baseEpoch ; integer epochOffset) {  
+	
+		numTuples = dataTupleCount[baseEpochPos][epochOffset]
+		
+		if numTuples > 0 then {
+			for subStreamCount = 0 .. (numTuples-1) : 1 do {
+				dataTuple = buffer[baseEpochPos][epochOffset][subStreamCount]
+				send dataTuple on pushTupleChan
+			}			
+		}
+		
+		//reset the index arrays for this epoch
+		dataTupleCount[baseEpochPos][epochOffset] := 0;
+	}
+
+	
+	/* 
+	 * Checks the baseEpoch of an incoming data tuple / null tuple / missing tuple.  There are three 
+	 * possible cases:
+	 * 1. If from an older epoch than the minEpoch, the tuple is discarded because it should have already 
+	 * been reported as missing.  The minE	poch remains unchanged.
+	 * 2. If the baseEpoch of the incoming data tuple is greater than maxEpoch (the highest epoch being stored in the 
+	 * buffer), old tuples are flushed out and any which have not been accounted for are reported as missing.
+	 * The minEpoch is then increased accordingly. 
+	 * 3. If the baseEpoch is within the range of the buffer, no action is required, and the minEpoch
+	 * remains unchanged. 
+	 * 
+	 * */
+	proc ronsFlushOldTuples(RonsTuple tuple) {
+	
+		//send any("RONS BUFFER: Tuple from newer epoch received, need to flush buffer\n") on trace
+		
+		// If a tuple arrives which is too new to fit in buffer, need to flush out the old 
+		// tuples even if not all tuples have been accounted for
+		// send everything from minEpoch to
+		deliverUntilEpoch = tupleBaseEpoch - ((numAgendaEvalsToBuffer - 1) * bufferingFactor) - 1
+		
+		for tmpEpoch = minEpoch .. deliverUntilEpoch do {
+			tmpBaseEpoch = (tmpEpoch / bufferingFactor) * bufferingFactor;
+			tmpBaseEpochPos = getBaseEpochPos(tmpBaseEpoch, minEpoch, bufferingFactor, 
+					minEpochPos, numAgendaEvalsToBuffer)
+			tmpEpochOffset = tmpEpoch % bufferingFactor;
+			
+			ronsSendEpochTuplesFromBuffer(tmpBaseEpochPos, tmpBaseEpoch, tmpEpochOffset)
+		}
+			
+		oldMinEpoch = minEpoch
+		minEpoch := deliverUntilEpoch + 1
+		//if minEpoch changes, need to change minEpochPos as well!
+		minEpochPos := (minEpochPos + ((minEpoch - oldMinEpoch) / bufferingFactor)) % numAgendaEvalsToBuffer
+		
+	}
+
+	/*
+	 * Checks whether all tuples have been accounted for in this epoch.
+	 */
+	proc ronsCheckAllTuplesAccountedFor() : bool {
+		allTuplesAccountedFor = true;
+		for epochCount = 0 .. (bufferingFactor - 1) do {
+			if dataTupleCount[tupleBaseEpochPos][epochCount] < streamMaxCardinality then { 
+				allTuplesAccountedFor := false;
+			}
+		}
+		return allTuplesAccountedFor;
+	}
+	
+	proc ronsAddTupleToBuffer(RonsTuple tuple) {
+		tupleEpochOffset := tuple.evalEpoch % bufferingFactor;
+		tupleBaseEpochPos := getBaseEpochPos(tupleBaseEpoch, minEpoch, bufferingFactor, minEpochPos, numAgendaEvalsToBuffer) 
+		count = dataTupleCount[tupleBaseEpochPos][tupleEpochOffset]
+		if count == streamMaxCardinality then {
+			count := 0	// shouldn't happen, but if no room, overwrite old tuples
+		}
+		buffer[tupleBaseEpochPos][tupleEpochOffset][count] := tuple;
+		dataTupleCount[tupleBaseEpochPos][tupleEpochOffset] := count + 1;			
+	}
+	
+	constructor() {
+	}
+	
+	behaviour{
+		
+		receive tuple from receiveTupleChan
+		tupleBaseEpoch := (tuple.evalEpoch / bufferingFactor) * bufferingFactor
+		
+		//the highest epoch which currently fits in the buffer
+		maxEpoch = minEpoch + (numAgendaEvalsToBuffer * bufferingFactor) - 1
+		
+		if tuple.evalEpoch > maxEpoch then {
+			//tuple too new to fit in buffer received, get rid of old tuples
+			ronsFlushOldTuples(tuple)
+		}
+				
+		//add the tuple to the buffer
+		if tuple.evalEpoch >= minEpoch then {
+			ronsAddTupleToBuffer(tuple)
+
+			allTuplesAccountedFor = ronsCheckAllTuplesAccountedFor()
+					
+			if allTuplesAccountedFor then {		
+				for epochCount = 0 .. (bufferingFactor - 1) do {
+					ronsSendEpochTuplesFromBuffer(minEpochPos, minEpoch, epochCount)				
+				}
+				minEpoch := minEpoch + bufferingFactor; //increase base epoch by buffering factor
+				minEpochPos := (minEpochPos + 1) % numAgendaEvalsToBuffer;
+			}
+		} else {
+			//old tuple received
+			//send(any("RONS BUFFER: Tuple from older epoch discarded in RonsBuffer\n")) on trace				
+		}
+	}
+}
+		
+
+type IAlsBuffer is interface (in AlsTuple receiveTupleChan; out AlsTuple pushTupleChan ); //; out any trace
+
+component AlsBuffer presents IAlsBuffer {
+
+	
+	/* Query-plan dependent constants*/
+	numAgendaEvalsToBuffer = 4						//inter-agenda evaluation buffering
+	bufferingFactor = 3								//intra-agenda evaluation buffering
+	streamMaxCardinality = 1						//the cardinality of the stream (per-epoch)
+	
+	dummyTuple = new AlsTuple(0, 0, 0.0)		    //just for padding purposes
+	
+	/* The main buffer which holds the tuples */
+	buffer = new AlsTuple[4][3][1] of dummyTuple;  //[x][y][z] where 
+													//x=agenda_evals_to_buffer (circular list)
+													//y=buffering factor 
+													//z=num sub-streams
+
+	minEpoch = 0   			// lowest epoch number of tuples in this buffer  
+	minEpochPos = 0			// the position of the minEpoch in the first dimension of buffer
+							// this is implemented as a circular list to avoid copying tuples
+
+	dataTupleCount = new integer[4][3] of 0  		// the number of result tuples containing data which have been
+													// received for an epoch.  Also denotes the position in the
+													// buffer array where next tuple for the epoch should be placed.
+
+	tupleBaseEpoch = -1			// the first epoch in the agenda evaluation that the tuple was acquired in
+	tupleEpochOffset = -1    	// the epoch number in the agenda evaluation that the tuple was acquired in
+	tupleBaseEpochPos = -1		// the position in the circular list which corresponds to this tupleBaseEpoch
+	
+	/* Sends tuples for buffer for particular epoch identified by baseEpochPos and epochOffset.
+	 * If a nullTuple or missingTuple notification is received, this is forwarded.
+	 * If not all tuples have been accounted for, a MissingTuple notification is generated.
+	 */
+	proc alsSendEpochTuplesFromBuffer(integer baseEpochPos ; integer baseEpoch ; integer epochOffset) {  
+	
+		numTuples = dataTupleCount[baseEpochPos][epochOffset]
+		
+		if numTuples > 0 then {
+			for subStreamCount = 0 .. (numTuples-1) : 1 do {
+				dataTuple = buffer[baseEpochPos][epochOffset][subStreamCount]
+				send dataTuple on pushTupleChan
+			}			
+		}
+		
+		//reset the index arrays for this epoch
+		dataTupleCount[baseEpochPos][epochOffset] := 0;
+	}
+
+	
+	/* 
+	 * Checks the baseEpoch of an incoming data tuple / null tuple / missing tuple.  There are three 
+	 * possible cases:
+	 * 1. If from an older epoch than the minEpoch, the tuple is discarded because it should have already 
+	 * been reported as missing.  The minE	poch remains unchanged.
+	 * 2. If the baseEpoch of the incoming data tuple is greater than maxEpoch (the highest epoch being stored in the 
+	 * buffer), old tuples are flushed out and any which have not been accounted for are reported as missing.
+	 * The minEpoch is then increased accordingly. 
+	 * 3. If the baseEpoch is within the range of the buffer, no action is required, and the minEpoch
+	 * remains unchanged. 
+	 * 
+	 * */
+	proc alsFlushOldTuples(AlsTuple tuple) {
+	
+		//send any("ALS BUFFER: Tuple from newer epoch received, need to flush buffer\n") on trace
+		
+		// If a tuple arrives which is too new to fit in buffer, need to flush out the old 
+		// tuples even if not all tuples have been accounted for
+		// send everything from minEpoch to
+		deliverUntilEpoch = tupleBaseEpoch - ((numAgendaEvalsToBuffer - 1) * bufferingFactor) - 1
+		
+		for tmpEpoch = minEpoch .. deliverUntilEpoch do {
+			tmpBaseEpoch = (tmpEpoch / bufferingFactor) * bufferingFactor;
+			tmpBaseEpochPos = getBaseEpochPos(tmpBaseEpoch, minEpoch, bufferingFactor, 
+					minEpochPos, numAgendaEvalsToBuffer)
+			tmpEpochOffset = tmpEpoch % bufferingFactor;
+			
+			alsSendEpochTuplesFromBuffer(tmpBaseEpochPos, tmpBaseEpoch, tmpEpochOffset)
+		}
+			
+		oldMinEpoch = minEpoch
+		minEpoch := deliverUntilEpoch + 1
+		//if minEpoch changes, need to change minEpochPos as well!
+		minEpochPos := (minEpochPos + ((minEpoch - oldMinEpoch) / bufferingFactor)) % numAgendaEvalsToBuffer
+		
+	}
+
+	/*
+	 * Checks whether all tuples have been accounted for in this epoch.
+	 */
+	proc alsCheckAllTuplesAccountedFor() : bool {
+		allTuplesAccountedFor = true;
+		for epochCount = 0 .. (bufferingFactor - 1) do {
+			if dataTupleCount[tupleBaseEpochPos][epochCount] < streamMaxCardinality then { 
+				allTuplesAccountedFor := false;
+			}
+		}
+		return allTuplesAccountedFor;
+	}
+	
+	proc alsAddTupleToBuffer(AlsTuple tuple) {
+		tupleEpochOffset := tuple.evalEpoch % bufferingFactor;
+		tupleBaseEpochPos := getBaseEpochPos(tupleBaseEpoch, minEpoch, bufferingFactor, minEpochPos, numAgendaEvalsToBuffer) 
+		count = dataTupleCount[tupleBaseEpochPos][tupleEpochOffset]
+		if count == streamMaxCardinality then {
+			count := 0	// shouldn't happen, but if no room, overwrite old tuples
+		}
+		buffer[tupleBaseEpochPos][tupleEpochOffset][count] := tuple;
+		dataTupleCount[tupleBaseEpochPos][tupleEpochOffset] := count + 1;			
+	}
+	
+	constructor() {
+	}
+	
+	behaviour{
+		
+		receive tuple from receiveTupleChan
+		tupleBaseEpoch := (tuple.evalEpoch / bufferingFactor) * bufferingFactor
+		
+		//the highest epoch which currently fits in the buffer
+		maxEpoch = minEpoch + (numAgendaEvalsToBuffer * bufferingFactor) - 1
+		
+		if tuple.evalEpoch > maxEpoch then {
+			//tuple too new to fit in buffer received, get rid of old tuples
+			alsFlushOldTuples(tuple)
+		}
+				
+		//add the tuple to the buffer
+		if tuple.evalEpoch >= minEpoch then {
+			alsAddTupleToBuffer(tuple)
+
+			allTuplesAccountedFor = alsCheckAllTuplesAccountedFor()
+					
+			if allTuplesAccountedFor then {		
+				for epochCount = 0 .. (bufferingFactor - 1) do {
+					alsSendEpochTuplesFromBuffer(minEpochPos, minEpoch, epochCount)				
+				}
+				minEpoch := minEpoch + bufferingFactor; //increase base epoch by buffering factor
+				minEpochPos := (minEpochPos + 1) % numAgendaEvalsToBuffer;
+			}
+		} else {
+			//old tuple received
+			//send(any("ALS BUFFER: Tuple from older epoch discarded in AlsBuffer\n")) on trace				
+		}
+	}
+}
+
+
+//type IJoin is interface(in AlsTuple leftReceiveTupleChan ; in RonsTuple rightReceiveTupleChan ; out JoinTuple pushTupleChan ; 
+//		out any trace) 
+//
+//component Join presents IJoin {
+//
+//	proc performJoin(AlsTuple leftTuple; RonsTuple rightTuple)  {
+//		outTuple = new JoinTuple(0,0.0,0.0)
+//		outTuple.evalEpoch := leftTuple.evalEpoch
+//		outTuple.alsTemp := leftTuple.alsTemp
+//		outTuple.ronsTemp := rightTuple.ronsTemp
+//		send outTuple on pushTupleChan			
+//	}
+//	
+//	bufferSize = 15
+//	
+//	alsDummyTuple = new AlsTuple(0, 0, 0.0)
+//	leftBuffer = new AlsTuple[15] of alsDummyTuple
+//	leftHead = -1
+//	leftTail = 0
+//	leftMinEpoch = -1
+//	leftReady = false
+//	
+//	ronsDummyTuple = new RonsTuple(0, 0, 0.0)
+//	rightBuffer = new RonsTuple[15] of ronsDummyTuple
+//	rightHead = -1
+//	rightTail = 0
+//	rightMinEpoch = -1
+//	rightReady = false
+//	
+//	constructor() {
+//		
+//	}
+//	
+//	behaviour {
+//		
+//		select {
+//			receive leftTuple from leftReceiveTupleChan : {
+//				leftBuffer[leftHead] := leftTuple
+//				if leftHead == leftTail then {
+//					//buffer full, overwriting oldest tuples
+//					leftHead := (leftHead + 1) % bufferSize
+//				}
+//				leftTail := (leftTail + 1) % bufferSize
+//				send any("JOIN: left tuple received") on trace
+//			}
+//			receive rightTuple from rightReceiveTupleChan : {
+//				rightBuffer[rightHead] := rightTuple
+//				if rightHead == rightTail then {
+//					//buffer full, overwriting oldest tuples					
+//					rightHead := (rightHead + 1) % bufferSize
+//				}
+//				rightTail := (rightTail + 1) % bufferSize
+//				send any("JOIN: right tuple received") on trace
+//			}
+//		}
+//		
+//		leftReadyToJoin = false
+//		leftHeadTuple = leftBuffer[leftHead]
+//		leftTailTuple = leftBuffer[leftTail]
+//		if leftHeadTuple.evalEpoch < leftTailTuple.evalEpoch then {
+//			leftReadyToJoin := true
+//		}
+//		
+//		rightReadyToJoin = false
+//		rightHeadTuple = rightBuffer[rightHead]
+//		rightTailTuple = rightBuffer[rightTail]
+//		if rightHeadTuple.evalEpoch < rightTailTuple.evalEpoch then {
+//			rightReadyToJoin := true
+//		}
+//		
+//		if leftReadyToJoin and rightReadyToJoin then {
+//			nextEpochFound = false
+//			if leftHeadTuple.evalEpoch == rightHeadTuple.evalEpoch then {
+//				for leftCount = leftHead .. (leftHead + bufferSize - 1) do {
+//					leftPos = leftCount % bufferSize
+//					leftTuple := leftBuffer[leftPos]
+//					if leftTuple.evalEpoch == leftHeadTuple.evalEpoch then {
+//						for rightCount = rightHead .. (rightHead + bufferSize - 1) do {
+//							rightPos = rightCount % bufferSize
+//							rightTuple := rightBuffer[rightPos]
+//							if rightTuple.evalEpoch == rightHeadTuple.evalEpoch then {
+//								performJoin(leftTuple, rightTuple)
+//								leftHead := leftPos
+//								rightHead := rightPos
+//							}
+//						}
+//					}
+//				}
+//			} else if leftHeadTuple.evalEpoch < rightHeadTuple.evalEpoch then {
+//				for tmpLeftCount = leftHead .. (leftHead + bufferSize - 1) do {
+//					tmpLeftPos = tmpLeftCount % bufferSize
+//					leftTuple := leftBuffer[tmpLeftPos]
+//					if leftTuple.evalEpoch > leftHeadTuple.evalEpoch and !nextEpochFound then {
+//						leftHead = tmpLeftPos
+//						nextEpochFound := true
+//					}
+//				}
+//			} else {
+//				for tmpRightCount = rightHead .. (rightHead + bufferSize - 1) do {
+//					tmpRightPos = tmpRightCount % bufferSize
+//					rightTuple := rightBuffer[tmpRightPos]
+//					if rightTuple.evalEpoch > rightHeadTuple.evalEpoch and !nextEpochFound then {
+//						rightHead = tmpRightPos
+//						nextEpochFound := true
+//					}
+//				}				
+//			}
+//		}
+//	}	
+//}
+
+
+type IAlsDeliver is interface(in AlsTuple receiveTupleChan; out any output);
+
+component AlsDeliver presents IAlsDeliver {
+
+	constructor() {	
+	}
+		
+	behaviour {
+	    // to fix CGEN error declare a join tuple outside select to force inclusion of header
+		select {
+			receive dataTuple from receiveTupleChan : {
+				printAlsTuple("ALS DELIVER:", dataTuple, output)
+			}
+		}
+	}
+}
+
+type IRonsDeliver is interface(in RonsTuple receiveTupleChan; out any output);
+
+component RonsDeliver presents IRonsDeliver {
+
+	constructor() {	
+	}
+		
+	behaviour {
+	    // to fix CGEN error declare a join tuple outside select to force inclusion of header
+		select {
+			receive dataTuple from receiveTupleChan : {
+				printRonsTuple("RONS DELIVER:", dataTuple, output)
+			}
+		}
+	}
+}
+
+
+//components
+
+receiver = new Receiver()
+alsBuffer = new AlsBuffer()
+ronsBuffer = new RonsBuffer()
+//join = new Join()
+alsDeliver = new AlsDeliver()
+ronsDeliver = new RonsDeliver()
+
+//connecting components
+connect receiver.radioChan to rucRadioIn.iochannel
+connect receiver.radioSetNodeAddress to rucRadio.setNodeAddress
+connect receiver.pushAlsTupleChan to alsBuffer.receiveTupleChan
+connect receiver.pushRonsTupleChan to ronsBuffer.receiveTupleChan
+connect receiver.trace to standardOut
+
+connect alsBuffer.pushTupleChan to alsDeliver.receiveTupleChan
+//connect alsBuffer.trace to standardOut
+connect ronsBuffer.pushTupleChan to ronsDeliver.receiveTupleChan
+//connect ronsBuffer.trace to standardOut
+//connect ronsBuffer.trace to standardOut
+
+//connect join.pushTupleChan to deliver.receiveTupleChan
+//connect join.trace to standardOut
+
+connect alsDeliver.output to standardOut
+connect ronsDeliver.output to standardOut
+

@@ -1,0 +1,26 @@
+
+type IComponent is interface ( in any input ) 
+
+component Comp presents IComponent {
+
+	h = 0
+	
+	constructor() { }
+	
+	behaviour {
+		receive a1 from input
+		receive a2 from input
+		a2 := a1 
+		a = any(2)
+//		b = any(2)
+//		c = any(2)
+		i = 0
+		j = 0 
+		
+		i := j + 1
+		j := 2*j + 2
+		
+		k = 0
+	}	
+}
+

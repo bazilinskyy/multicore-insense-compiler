@@ -1,0 +1,62 @@
+/*
+ * Experiment to test creation of structures inside of components.
+ *
+ *
+ * Copyright (c) 2013, Pavlo Bazilinskyy <pavlo.bazilinskyy@gmail.com>
+ * School of Computer Science, St. Andrews University
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+ 
+type IHello is interface () // Interface for Hello component
+
+// Component with string passed as an argument
+component ComponentStruct presents IHello {
+
+	type foo is struct( integer a; string b );
+	id = 0
+	p = new foo(0, "")
+	q = new foo(0, "")
+	
+	constructor(integer idt; integer a; string b) {
+		// Test initilisation of elements inside of the struct
+		p.a := 4
+		p.b := "abc";
+		q.a := a;
+		q.b := b;
+		p := q
+		s = p.a
+		id := idt
+	}
+		
+	behaviour {
+		printString("\n\nSTART OF BAHAVIOUR for ")
+		printInt(id)
+		printString("a: ")
+		printInt(p.a)
+		printString(" b: ")
+		printString(p.b)
+		printString("\n\nEND OF BAHAVIOUR\n\n")
+	}
+}
+
+// Create and test components
+struct1 = new ComponentStruct(1, 4, "abc")
+struct2 = new ComponentStruct(2, 5, "xyz")
+struct3 = new ComponentStruct(3, 6, "string")

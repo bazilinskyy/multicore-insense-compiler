@@ -1,0 +1,19 @@
+// Simple component 
+
+type t1 is interface( out integer output )
+
+component Ints presents t1 {
+	
+	last = 0;
+	
+	// error no constructor defined!
+	
+	behaviour {
+		send last on output
+		last := last + 1
+	}
+}
+
+ 
+
+

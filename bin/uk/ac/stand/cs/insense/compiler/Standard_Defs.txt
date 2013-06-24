@@ -1,0 +1,182 @@
+
+// button sensor component
+type IButtonSensor is interface( out integer output )
+buttonSensor : IButtonSensor
+////////////////////////////////////////////////////////////////////////////////////////
+//General Sensor component for the tmote sky with temperature, humidity and light
+//Also have added the sensor channels for the sensors avalibale on the CO1000 on the CM4000 from advanticsys
+type ISensors is interface ( in bool photoRequest ; out integer photoOut;
+							 in bool solarRequest ; out integer solarOut;
+							 in bool humidRequest ; out integer humidOut;
+							 in bool tempRequest  ; out integer tempOut ;
+							 in bool batteryRequest ; out integer batteryOut ;
+							 in bool pressureRequest ; out integer pressureOut ;
+							 in bool tiltXRequest ; out integer tiltXOut ;
+							 in bool tiltYRequest ; out integer tiltYOut ;
+							 in bool accelXRequest ; out integer accelXOut ;
+							 in bool accelYRequest ; out integer accelYOut ;
+							 in bool internalTempRequest ; out integer internalTempOut )
+sensors : ISensors
+////////////////////////////////////////////////////////////////////////////////////////
+// The stream sensor request type and interface
+type streamReq is struct(byte id ; integer[] buffer)
+type Istream is interface (in streamReq postBuffer ;  in unsigned setPeriod ; out streamReq bufferDone ; out bool noMoreBuffers)
+
+//pressureSensor  :  Istream
+accelxSensor 	:  Istream
+accelySensor 	:  Istream
+tiltxSensor 	:  Istream
+tiltySensor 	:  Istream
+////////////////////////////////////////////////////////////////////////////////////////
+//** Timer & Rtimer Components, interfaces, structure and functions
+type rtimerReq is struct(in bool timer ;  real interval)
+
+type Irtimer is interface( in rtimerReq request ; out bool reply)
+
+rtimer			: Irtimer
+
+// For interaction with Timer (only via pre-written procedures)
+setTimer   : proc(in bool ; real ; bool ) 
+unsetTimer : proc(in bool) 	 
+setRtimer  : proc(in bool ; real )
+/////////////////////////////////////////////////////////////////////////
+//The storage component
+//type eraseStruct is struct(unsigned len ; unsigned offset )
+type readStruct  is struct(in integer[] replyChan ; integer[] buffer )
+//type writeStruct is struct(integer[] buffer ; unsigned offset)
+
+type Istorage is interface(	in readStruct read ; 
+							in integer[] write ; 
+							in bool erase ; 
+							in bool offsetReq ; out unsigned offsetVal; 
+							in unsigned setOffset)
+
+storage			: Istorage
+////////////////////////////////////////////////////////////////////////////////////////
+// For switches
+type switchState is enum( Off , On )
+////////////////////////////////////////////////////////////////////////////////////////
+type Iserial is interface(out string incoming)
+
+serial			: Iserial
+////////////////////////////////////////////////////////////////////////////////////////
+// Labelled exception type
+type ExceptionType is enum(  
+	OperationFailedException,
+	ChannelBufferFullException,
+	DivisionByZeroException,
+	SendStatusUnknownException,
+	DuplicateLCNException,
+	NodesUnreachableException,
+	ChannelsUnknownException,
+	IncompatibleChannelsException,
+	BindStatusUnknownException
+)
+////////////////////////////////////////////////////////////////////////////////////////
+// LEDs component
+type ledState is enum(
+	RedOffGreenOffBlueOff,
+	RedOffGreenOnBlueOff,
+	RedOffGreenOffBlueOn,
+	RedOffGreenOnBlueOn,
+	RedOnGreenOffBlueOff,
+	RedOnGreenOnBlueOff,
+	RedOnGreenOffBlueOn,
+	RedOnGreenOnBlueOn
+)
+						
+// LEDs procedures as lightweight replacements for LEDs component
+setRedLedPower 		: proc(bool) 
+setGreenLedPower 	: proc(bool)
+setBlueLedPower 	: proc(bool)
+setLeds 			: proc(ledState)
+setLedsUsingInt 	: proc(integer)
+////////////////////////////////////////////////////////////////////////////////////////
+// Radio procedures
+
+// Address type is an unsigned integer
+type address is unsigned
+
+// Radio Packet data structure
+type RadioPacket is struct( address addr ; any payload )
+
+// Radio component 
+type IRadio is interface( 
+	in any broadcastSend ; 						//for broadcasting components
+	in RadioPacket unicastSend ; 				//unrealiable unicast to a specific mote
+	in RadioPacket reliableUnicastSend ;		//realiable unicast to a specific mote
+	out RadioPacket received  ;					//got a bcast or ucast packet
+	out bool reliableResult				//feedback on how the tranmission went (success||fail)
+	)
+	
+radio : IRadio
+
+//setRadioNodeAddress : proc(unsigned)
+getNodeAddress : proc():address
+//setRadioPower : proc(bool)
+//getRadioPower : proc():bool
+
+////////////////////////////////////////////////////////////////////////////////////////
+// Sensor procedures as lightweight replacement for sensor components 
+type intSensor is proc():integer
+type realSensor is proc():real
+
+photoReading : intSensor
+solarReading : intSensor
+tempReading : intSensor
+humidReading : intSensor
+batteryReading : intSensor
+////////////////////////////////////////////////////////////////////////////////////////
+// Some general purpose utility procedures
+avgIntArray 		: proc(integer[])		:real
+avgRealArray 		: proc(real[])			:real
+intToByte 			: proc(integer)			:byte
+intToUnsigned 		: proc(integer)			:unsigned
+byteArrayEqual 		: proc(byte[]; byte[])	:bool
+absInt 				: proc(integer)			:integer
+absReal 			: proc(real)			:real
+squareInt 			: proc(integer)			:integer
+squareReal 			: proc(real)			:real
+squareRoot 			: proc(real)			:real
+realToInt 			: proc(real)			:integer
+
+printStackUsage 	: proc()
+printAny 			: proc(any)
+printString 		: proc(string)
+printInt 			: proc(integer)
+printReal 			: proc(real)
+printUnsignedInt 	: proc(unsigned)
+printByte 			: proc(byte)
+printTCString 		: proc(string)
+printTCInt 			: proc(integer)
+printTCReal 		: proc(real)
+printTCUnsignedInt  : proc(unsigned)
+printTCByte 		: proc(byte)
+
+getString 			: proc()				:string
+stringEquals 		: proc(string; string)	:bool
+stringStartsWith 	: proc(string; string)	:bool
+charAt				: proc(string; unsigned): unsigned
+
+parseInt 			: proc(string)			:integer
+parseUnsignedInt 	: proc(string)			:unsigned
+parseReal 			: proc(string)			:real
+////////////////////////////////////////////////////////////////////////////////////////
+// Paul added an Integer Fast Fourier Transform function to the OS
+ifft 				: proc(integer[] ; integer)
+////////////////////////////////////////////////////////////////////////////////////////
+// New InterNodeChannel types and procedures
+type ChannelDirection is enum ( Out, In, Either )
+type PublicChannel is struct ( ChannelDirection direction ; string typerep ; string LCN )
+
+findNodesPublishing : proc(ChannelDirection ; string ; string) : unsigned[]
+getNumberHopsTo : proc(unsigned) : integer
+getNeighbours : proc() : unsigned[]
+getNeighboursOf : proc(unsigned) : unsigned[]
+getPublicChannels : proc() : PublicChannel[]
+getPublicChannelsOf : proc(unsigned) : PublicChannel[]
+enableInterNodeChannelRouting : proc()
+
+setCore : proc(unsigned)
+
+

@@ -1,0 +1,107 @@
+// Simple example showing how to write a proxy in Insense
+
+
+type ISender is interface ( out integer output ; in bool ticks)
+type IProxy is interface ( in integer input ; out integer output ; in bool ticks)
+type IReceiver is interface ( in integer input )
+
+component Sender presents ISender {
+		
+	count = 0
+	
+	constructor(){
+	}
+	
+	behaviour {
+		receive tick from ticks
+		printString("\nS: sending ")
+		printInt(count)
+		printString(" on channel ... \n")
+		try {
+			send count on output
+			printString("S: sending ")
+			printInt(count)
+			printString(" complete \n")
+		} except SendStatusUnknownException {
+			printString("S: send status unknown\n")
+		}
+		count := count + 1
+	}
+}
+
+
+component Proxy presents IProxy {
+
+	name = "P"
+	
+	constructor(string s){
+		name := s
+	}
+	
+	behaviour {
+		select {
+			receive tick from ticks : {
+				printString(name)
+				printString(": got tick\n")
+			}
+			acknowledge value from input after : {
+				printString(name)
+				printString(": got ")
+				printInt(value)
+				printString(" on input, sending on output ... \n")
+				send value on output			
+				printString(name)
+				printString(": send complete\n")
+			}
+		}
+	}
+}
+
+
+component Receiver presents IReceiver {
+		
+	useAckAfter = false
+
+	proc printValue(integer value){
+		printString("R: got ")
+		printInt(value)
+		printString("\n")
+	}
+	
+	constructor(bool ackAfter){
+		useAckAfter := ackAfter
+	}
+	
+	behaviour {
+		if useAckAfter then {
+			acknowledge x from input after {
+				printValue(x)
+			}
+		} else {
+			receive x from input
+			printValue(x)
+		}
+	}
+}
+
+
+receiver = new Receiver(true) // flip between true and false here to see effect of acknowledge after in receiver or not 
+proxy2 = new Proxy("P2")
+proxy1 = new Proxy("P1")
+sender = new Sender()
+
+connect sender.output to proxy1.input
+connect proxy1.output to proxy2.input
+connect proxy2.output to receiver.input
+
+setTimer(sender.ticks, 5.0, true)
+setTimer(proxy1.ticks, 2.0, true)
+setTimer(proxy2.ticks, 7.0, true)
+
+
+//sender = new Sender()
+//receiver = new Receiver(true) // flip between true and false here to see effect of acknowledge after in receiver or not 
+//connect sender.output to receiver.input
+
+
+

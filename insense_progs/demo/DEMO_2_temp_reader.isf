@@ -1,0 +1,27 @@
+// Simple program to print the temperature
+
+// Interface for TempReader component
+type ITempReader is interface ( out bool tRequestChan ; 
+				in integer tValueChan ; out any stdoutChan )
+
+// Temperature reader
+component TempReader presents ITempReader {
+
+	constructor() {	
+	}
+		
+	behaviour {
+		send true on tRequestChan
+		receive temp from tValueChan
+		// In addition to the channel-based interface to the sensors, Insense
+		// also provides a procedural interface, so the above send-receive
+		// could be rpleaced with the following single procedure call
+		// temp = tempReading()
+		printString("\nTemp = ")
+		printInt(temp)
+	}
+} 
+
+tr = new TempReader()
+connect tr.tRequestChan to sensors.tempRequest
+connect tr.tValueChan to sensors.tempOut

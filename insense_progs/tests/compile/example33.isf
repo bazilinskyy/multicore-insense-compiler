@@ -1,0 +1,24 @@
+// Tests unary minus etc.
+
+type nullInterface is interface(in integer null)
+
+component Test presents nullInterface {
+	constructor() {
+	}
+	
+	
+	behaviour {
+		a = true
+		b = false
+		if a then {
+		}
+		x = ! b and a
+		y = x or a
+		z = ! ( y or b ) and ( a and b )
+	}
+}
+
+
+
+
+

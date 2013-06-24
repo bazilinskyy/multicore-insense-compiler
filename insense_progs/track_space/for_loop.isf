@@ -1,0 +1,34 @@
+
+type IComponent is interface ( out integer output ) 
+
+component Comp presents IComponent {
+
+	constructor() { }
+	
+	behaviour {
+		a = 0
+		for i = 0 .. 9 do {
+			a := a + i
+		}
+		for i = 0 .. 9 do {
+			z = 2
+			for j = 0 .. 9 do {
+				a := a + i * j
+				//str = "hello"
+				b = 5
+				//b = absInt(i)
+			}
+		}
+		for i = 0 .. 9 do {
+			z = 2
+			for j = 0 .. 9 do {
+				a := a + i * j
+				//str = "hello"
+				b = 5
+				//b = absInt(i)
+			}
+		}
+	}
+}
+
+comp = new Comp()

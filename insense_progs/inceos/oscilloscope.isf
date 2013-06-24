@@ -1,0 +1,44 @@
+
+
+
+//Reading struct
+type oscilloscope_s is struct (
+  							  integer version; 
+							  integer interval;
+							  integer id; 
+							  integer count; 
+							  integer[] readings)
+
+
+//Oscilloscope interface
+type oscI is interface()
+
+
+/*--------------------------------------------------------*/
+component osc presents oscI {
+
+        interval = 0.0
+
+        constructor(integer i) {
+
+                interval := i
+        }
+
+
+        behaviour {
+
+        }
+}
+
+
+
+
+/*--------------------------------------------------------*/
+
+
+
+
+
+
+
+/*--------------------------------------------------------*/

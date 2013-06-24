@@ -1,0 +1,92 @@
+// Simple example of 3 senders and a single selector printing out
+// the received values to standard output that has type interface ( in any input )
+
+
+type ISelector is interface( in integer ticker, tocker, tacker ; in string test )
+type ITucker is interface ( out integer output )
+
+
+component Selector presents ISelector {
+	
+	a = 10
+	mesg = ""
+	
+	constructor() {
+	}
+	
+	behaviour {
+		select {
+		    receive x from ticker when a > 7 : { mesg := "\ntick " ; a := x }
+		    receive y from tocker : { mesg := "\ntock " ; a := y }
+		    receive z from tacker when a < 7 : {mesg := "\ntack " ; a := z } 
+		    receive s from test : { printString(s) }
+		    //default: { mesg := "\ndefault " ; a := 1 }
+		}
+		printString(mesg)
+		printInt(a)
+	}
+}
+
+component Ticker presents ITucker {
+
+	value = 0
+		
+	constructor() {	
+	}
+	
+	behaviour {
+		send value on output
+		value := value + 1
+	}
+} 
+
+component Tocker presents ITucker {
+
+	value = -100
+		
+	constructor() {	
+	}
+	
+	behaviour {
+		send value on output
+		value := value + 1
+	}
+} 
+
+component Tacker presents ITucker {
+
+	value = 100
+		
+	constructor() {	
+	}
+	
+	behaviour {
+		send value on output
+		value := value + 1
+	}
+} 
+
+//type ITester is interface ( out string output )
+//
+//component Tester presents ITester {
+//
+//	constructor() {	
+//	}
+//	
+//	behaviour {
+//		send "hello" on output
+//	}
+//} 
+
+
+
+sel = new Selector()
+tic = new Ticker()
+toc = new Tocker()
+tac = new Tacker()
+//tester = new Tester()
+
+connect tic.output to sel.ticker
+connect toc.output to sel.tocker
+connect tac.output to sel.tacker
+//connect tester.output to sel.test

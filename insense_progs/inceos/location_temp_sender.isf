@@ -1,0 +1,70 @@
+// Simple Insense program that gets tempertaure sensor readings and
+// sends these over the radio using the broadcast primitive 
+
+// struct for temp readings at a named location
+type TReading is struct (string location ; real temp)
+
+// global procedure to convert temperature integer 
+// as produced by sensor hardware to Celsius		
+proc tempIntToCelsiusReal(integer reading) : real {
+	return -45.3 + 0.01 * reading
+}
+
+// global proc to priint out TReading details
+proc printReading(TReading tr){
+	printString(tr.location)
+	printString(": temp = ")
+	printReal(tr.temp)
+	printString("\n")
+}
+
+
+// Interface for Temperature Sender
+type ITempSender is interface (
+		in bool ticks ;
+		out any radioSend ;
+		in RadioPacket radioReceive
+)
+
+// Temperature Sender component
+component TempSender presents ITempSender {
+
+	// component variable representing the location of the mote
+	location = ""
+				
+	// component procedure to handle an incoming radio packet
+	proc handlePacket(RadioPacket packet){
+		project packet.payload as value onto
+			TReading : { printReading(value)  }
+			default :  { printString( "???" ) }
+	}
+	
+	// component procedure to send a temp reading out on the radio
+	proc sendReading(){
+		temp = tempIntToCelsiusReal(tempReading())
+		reading = new TReading(location, temp)
+		send any(reading) on radioSend
+	}
+	
+	// zero-argument constructor
+	constructor() {
+		// read in user supplied location string to include in broadcast packets
+		// NOTE this will block until the component reads a valid string on USB serial line
+		location := getString()
+	}
+	
+	// main behaviour loop
+	behaviour {
+		
+		select {
+			receive tick from ticks : { sendReading() }
+			receive packet from radioReceive : { handlePacket(packet) }
+		}
+	}
+} 
+
+ts = new TempSender()
+
+connect ts.radioSend to radio.broadcastSend
+connect ts.radioReceive to radio.received
+setTimer(ts.ticks, 10.0, true)

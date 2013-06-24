@@ -1,0 +1,45 @@
+// Tests copy copy on send for complex types
+// Version 2 - includes arrays
+
+
+
+type pet is struct( string name; integer age )
+type person is struct( string name; pet[] pets )
+
+type foo is interface( out person people )
+type bah is interface( in person people )
+
+component Connect1 presents foo {
+	
+	constructor() {
+	}
+	
+	behaviour {
+		cat = new pet( "cat", 6 )
+		x = new pet[4] of cat
+		p = new person( "al", x )
+		send p on people
+	}
+}
+ 
+component Connect2 presents bah {
+	
+	constructor() {
+	}
+	
+	behaviour {
+		receive p from people
+	}
+}
+
+f = new Connect1();
+g = new Connect2();
+connect f.people to g.people;
+disconnect g.people
+
+
+
+
+
+
+

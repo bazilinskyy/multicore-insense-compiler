@@ -1,0 +1,101 @@
+/**
+ * Implementation of the RadioSenseToLeds application.  RadioSenseToLeds samples 
+ * a platform's default sensor at 4Hz and broadcasts this value in an AM packet. 
+ * A RadioSenseToLeds node that hears a broadcast displays the bottom three bits 
+ * of the value it has received. This application is a useful test to show that 
+ * basic AM communication, timers, and the default sensor work.
+ * 
+ */
+
+// Interface for Temperature Broadcaster
+type ITempBroadcast is interface (
+		out bool tempRequest ;
+		in integer tempValue ; 
+		out any broadcastSend ;
+		in integer button ;
+		in bool timerRecv ;
+)
+
+// Temperature Broadcaster component
+component TempBroadcast presents ITempBroadcast {
+
+	//count = 0 
+	test = true
+	constructor() {
+	}
+	
+	behaviour {	
+			
+			//wait for a button press to start sending
+			if(test) then {
+				receive tick1 from button
+				test := false
+			}
+
+			setTimer(timerRecv , 0.25 , false)
+			receive tick from timerRecv
+
+			// get temp sensor reading
+			send true on tempRequest
+			receive reading from tempValue
+		
+			//count := count + 1 
+
+			//if(count % 10 == 0) then {
+				send any(reading) on broadcastSend
+			//}
+	}
+} 
+
+/***************************************************************************/
+
+//Interface for Temperature Receiver
+type ITempReceiver is interface ( in RadioPacket broadcastRecv )
+
+//Temperature Reveicer Component
+component TempRecv presents ITempReceiver {
+
+	constructor() {
+	}
+
+	behaviour {
+
+		// wait for packet from Radio
+		receive packet from broadcastRecv
+
+		project packet.payload as reading onto
+			integer	: { 
+				if (reading & 4) == 4 then {
+					setRedLedPower(true)
+		      	} else {
+					setRedLedPower(false)
+				}
+				
+		        if (reading & 2) == 2 then {
+					setBlueLedPower(true)
+		      	} else {
+					setBlueLedPower(false)
+				}
+				
+		      	if (reading & 1) == 1 then {
+					setGreenLedPower(true)
+		      	} else {
+					setGreenLedPower(false)
+				}
+			}
+			default : { printString( "???" ) }
+	}
+}
+
+/***************************************************************************/
+//Create the components
+tbc = new TempBroadcast()
+trc = new TempRecv()
+
+//Connect the channels
+connect tbc.button to buttonSensor.output
+connect tbc.tempRequest to sensors.tempRequest
+connect tbc.tempValue to sensors.tempOut
+connect tbc.broadcastSend to radio.broadcastSend
+connect trc.broadcastRecv to radio.received
+

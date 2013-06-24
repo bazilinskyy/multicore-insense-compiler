@@ -1,0 +1,156 @@
+/*
+* Three different threads run, and each contains an infinite loop that first sends
+* a message and then waits to receive a message before returning to the top of the
+* loop. After each message reception, one of the onboard LEDs is toggled to
+* indicate that it was received. Thread 0 blinks LED0, thread 1 blinks LED1, and
+* thread 2 blinks LED2. The three threads run independently, and three different
+* messages are bounced back and forth between the two motes in an unsynchronized
+* fashion.  In contrast to the simple Bounce application found in the cthreads
+* version of this application, once a thread receives a message it waits on a
+* Barrier before continuing on and turning on its led.  A synchronization thread
+* is used to wait until all three messages have been received by each thread
+* before unblocking the barrier.  In this way, messages are still bounced back and
+* forth between the two motes in an asynchronous fashion, but all leds come on at
+* the same time because of the Barrier and the synchronization thread.  
+
+* Successful running of this application results in all three leds coming on in
+* unison on one mote and then coming on in unison on the other mote, back and
+* forth forever.
+*/
+
+//Used to specify the different led types
+type ledType is enum (red, green, blue, other)
+
+type syncI is interface (in bool incoming ; out bool reply)
+
+component sync presents syncI {
+
+	constructor() {
+	}
+	
+	behaviour {
+	
+		//wait for 3 receives
+		for i = 0 ..1 do {
+			receive ping from incoming
+			printString("Got sync request ")
+			printInt(i)
+			printString("\n")
+			
+		}
+		
+		//send 3 times
+		for i = 0 .. 1  do {
+			send true on reply
+			printString("Send sync reply ")
+			printInt(i)
+			printString("\n")
+			
+			
+		} 
+	}	
+}
+/***********************************************************/
+type bounceI is interface (in bool timerRecv ;  
+			out any broadcast ;
+			in RadioPacket recv;
+			out bool toSync ;
+			in bool fromSync							
+			)
+
+component bounce presents bounceI {
+
+	timeout = 0.0
+	sleep = 0.0
+	led = other
+
+	constructor(ledType colour ; real duration; real sleepTime) {
+	
+		timeout := duration
+		led := colour
+		sleep := sleepTime
+	}
+	
+	
+	behaviour {
+	
+		//turn off led
+		if (led == red) then{
+			setRedLedPower(false)
+		}
+		
+		if (led == green) then{
+			setGreenLedPower(false)
+		}
+		
+		if (led == blue) then{
+			setBlueLedPower(false)
+		}
+		
+		printString("Broadcast packet\n");
+		//broadcast data and wait for packet
+		send any(led) on broadcast
+
+		//set a timeout
+		setTimer(timerRecv , 5.0 , false)
+
+		select {
+			receive packet from recv :{
+				printString("Got packet\n");
+				unsetTimer(timerRecv)
+
+				project packet.payload as reading onto 
+					ledType : {
+						//barrier
+						//send true on toSync
+						//receive pass from fromSync
+				
+						//turn on led
+						if (reading == red) then{
+							printString("Red On\n")
+							setRedLedPower(true)
+						}
+				
+						if (reading == green) then{
+						printString("Green On\n")
+							setGreenLedPower(true)
+						}
+				
+						if (reading == blue) then{
+						printString("Blue On\n")
+							setBlueLedPower(true)
+						}
+				
+						//timeout
+						setTimer(timerRecv , timeout , false)
+						receive tick from timerRecv
+					}
+					integer : { printInt(reading)}
+					default : { printString( "???" ) }
+			}
+			receive tick from timerRecv : {}
+		}
+	}
+}
+/**********************************************************************/
+one =  new bounce(red, 0.5, 4.0)
+two =  new bounce(blue, 0.5, 6.0)
+three =  new bounce(green, 0.5, 8.0)
+barrier = new sync()
+
+connect one.broadcast to radio.broadcastSend
+connect two.broadcast to radio.broadcastSend
+connect three.broadcast to radio.broadcastSend
+
+connect one.recv to radio.received
+connect two.recv to radio.received
+connect three.recv to radio.received
+
+connect one.toSync to barrier.incoming
+connect two.toSync to barrier.incoming
+connect three.toSync to barrier.incoming
+
+connect one.fromSync to barrier.reply
+connect two.fromSync to barrier.reply
+connect three.fromSync to barrier.reply
+

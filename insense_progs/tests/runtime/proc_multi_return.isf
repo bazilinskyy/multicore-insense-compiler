@@ -1,0 +1,57 @@
+// Simple Hello World Insense program using procedures
+
+// Some procedures visible to all components
+
+proc condProc (integer number) : integer {
+	// testing multiple return statements in a non-void procedure
+	if number < 50 then {
+		return number * 2 
+	}
+	else if number < 100 then {
+		return number
+	}
+	return 200 - number
+}
+
+proc printOddInt (integer number ; out any chan) {
+	// testing return from void procedure
+	if (number % 2) == 0 then
+		return 
+	send(any(number)) on chan
+}
+
+proc printString(string str ; out any chan) { 
+	send(any(str)) on chan
+}
+
+
+// Interface for Hello component
+type IHello is interface ( out any output )
+
+
+// Hello World component
+component Hello presents IHello {
+
+	number = 1
+	
+	// procedure for local use in Hello component 
+	proc localPrintInt (integer number) {
+		send(any(number)) on output
+	}
+
+	constructor() {	
+	}
+			
+	behaviour {
+		printString("\nnumber = ", output)
+		localPrintInt(number)
+		printString("\tcondProc(number) = ", output)
+		localPrintInt(condProc(number))
+		printString("\tprintOddInt(number) = ", output)
+		printOddInt(number, output)
+		number := number + 1
+	}	
+} 
+
+hello = new Hello()
+connect hello.output to standardOut

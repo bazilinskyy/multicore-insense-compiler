@@ -1,0 +1,92 @@
+// Simple example showing how to write a proxy in Insense
+
+
+type ISender is interface ( out integer output )
+type IProxy is interface ( in integer input ; out integer output )
+type IReceiver is interface ( in integer input )
+
+component Sender presents ISender, ISchedulable {
+		
+	dutyCycle = 0
+	count = 0
+	
+	constructor(integer inDutyCycle){
+		dutyCycle := inDutyCycle
+		periodicEnSchedule( inTicksChan, dutyCycle )
+	}
+	
+	behaviour {
+		receive tick from inTicksChan
+		printAny(any("\nS: sending "))
+		printAny(any(count))
+		printAny(any(" on channel ... \n"))
+		send count on output
+		printAny(any("S: send complete\n"))
+		count := count + 1
+	}
+}
+
+
+component Proxy presents IProxy {
+
+	name = ""
+	
+	constructor(string s){
+		name := s
+	}
+	
+	behaviour {
+		acknowledge value from input after {
+			printAny(any(name))
+			printAny(any(": got "))
+			printAny(any(value))
+			printAny(any(" on input, sending on output ... \n"))
+			send value on output			
+			printAny(any(name))
+			printAny(any(": send complete\n"))
+		}
+	}
+}
+
+
+component Receiver presents IReceiver {
+		
+	useAckAfter = false
+
+	proc printValue(integer value){
+		printAny(any(""))
+		printAny(any("R: got "))
+		printAny(any(value))
+		printAny(any("\n"))
+	}
+	
+	constructor(bool ackAfter){
+		useAckAfter := ackAfter
+	}
+	
+	behaviour {
+		if useAckAfter then {
+			acknowledge x from input after {
+				printValue(x)
+			}
+		} else {
+			receive y from input
+			printValue(y)
+		}
+	}
+}
+
+
+
+
+sender = new Sender(3) // send every 3 secs
+proxy1 = new Proxy("P1")
+proxy2 = new Proxy("P2")
+receiver = new Receiver(false) // flip between true and false here to see effect of acknowledge after in receiver or not 
+
+connect sender.output to proxy1.input
+connect proxy1.output to proxy2.input
+connect proxy2.output to receiver.input
+
+
+

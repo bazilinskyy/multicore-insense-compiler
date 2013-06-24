@@ -1,0 +1,42 @@
+/*
+2 components bouncing arrays to each other
+*/
+
+type Ialpha is interface( in integer[] input ; out pressureR output )
+type Ibeta  is interface( in pressureR input ; out integer[] output )
+
+
+component alpha presents Ialpha {
+
+	testArray = new integer[20] of 0
+	
+	test = new pressureR(2000, testArray)
+
+	constructor(){}
+
+	behaviour{
+
+		send test on output 
+
+		receive x from input
+	}
+}
+
+component beta presents Ibeta {
+
+	constructor(){}
+
+	behaviour{
+
+		receive x from input
+
+		send x.buffer on output
+
+	}
+}
+
+a = new alpha()
+b = new beta()
+
+connect a.input to b.output
+connect a.output to b.input

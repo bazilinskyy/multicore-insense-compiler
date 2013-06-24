@@ -1,0 +1,68 @@
+// Simple Insense program testing arrays
+
+proc printArray(integer[] a; out any chan){
+	send (any("\nArray: [")) on chan
+	for i = 0 .. a.length-1 do {
+		send (any(a[i])) on chan
+		send (any(" ")) on chan
+	}
+	send (any("]")) on chan
+}
+
+
+proc fillArray(integer[] a ; integer start){
+	for i = 0 .. a.length-1 do {
+		a[i] := start + i
+	}
+}
+
+
+proc copySendArray(integer[] a ; out integer[] chan) : integer[] {
+	b = new integer[5] of 0
+	for i = 0 .. b.length-1 do {
+		b[i] := a[i]
+	}
+	send b on chan
+	return b
+}
+
+// Interface for Sensor Reader
+type ITest is interface (out any trace ; out integer[] output)
+
+component Test presents ITest {
+
+	a = new integer[5] of 0
+	start = 0
+	//b = new integer[3][3] of 0
+
+	
+	constructor() {	
+	}
+		
+	behaviour {
+		fillArray(a, start)
+		start := start + a.length
+		c = copySendArray(a, output)
+		//d = (any(c))
+		//e = (any(b))
+		printArray(c, trace)
+	}
+} 
+
+type IArrayReceiver is interface (in integer[] input ; out any trace)
+component ArrayReceiver presents IArrayReceiver {
+	
+	constructor(){}
+	
+	behaviour {
+		receive a from input
+		//printArray(a, trace)
+	}
+	
+}
+
+te = new Test()
+re = new ArrayReceiver()
+connect te.trace to standardOut
+connect te.output to re.input
+connect re.trace to standardOut

@@ -1,0 +1,49 @@
+
+type ReliableUnicastOutLinkRequest is struct( out any dataChan; // This will be used for sending data.
+					      byte[] destAddr;
+					      in bool ackChan; // Thus us the channel for receiving acks (might not exist)
+					      integer retransmissions )
+
+// Interface for Sender
+type ISender is interface( out ReliableUnicastOutLinkRequest radioRequestChan;
+			   out any dataChan;
+			   in bool ackChan;
+			   out bool radioSetPowerSupplyChan;
+			   out any trace )
+
+// Radio sender component
+component Sender presents ISender{
+
+	haveLink = false
+	cycle = 0
+	destAddr = new byte[2] of #0
+
+	proc connectToNode (out any dataChan ; byte[] destAddr ; in bool ackChan ; integer retransmissions){
+		// send request for link to radio
+		request = new RadioOutLinkRequest( dataChan, destAddr, ackChan, retransmissions)
+		send request on radioRequestChan
+		receive success from ackChan
+		if success then {
+			haveLink := true
+		}
+	}
+	
+	constructor() {
+		// sink node's address
+		destAddr[0] := #1 ; destAddr[1] := #0
+	}
+		
+	behaviour {
+		if haveLink then {
+			send (any(cycle)) on dataChan 	   // send packet on data channel
+			receive ack from ackChan	  // wait for sendAck
+			  if ack then { // we managed to send the number
+			    cycle := cycle + 1 // increment number for next time
+			} else {
+				haveLink := false
+			}
+		  } else { // no link currently
+			connectToNode(dataChan, destAddr, ackChan, 4)
+	       	  }
+	}
+} 

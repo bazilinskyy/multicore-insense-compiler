@@ -1,0 +1,50 @@
+
+type Reading is struct(integer cycle ; integer solar ; real temp)
+
+proc printReading(Reading data ; out any chan){
+	send (any("reading = ( cycle=")) on chan
+	send (any(data.cycle)) on chan
+	send (any(", solar=")) on chan
+	send (any(data.solar)) on chan
+	send (any(", temp=")) on chan
+	send (any(data.temp)) on chan
+	send (any(" )")) on chan
+}
+
+// Interface for Test
+type IRucReceiver is interface (in RadioPacket radioChan ; out byte[] radioSetNodeAddress ; out any trace)
+
+// RUC radio sender component
+component RucReceiver presents IRucReceiver {
+
+	constructor() {	
+		connect radioChan to radioIn.received
+		connect radioSetNodeAddress to radio.setNodeAddress
+		connect trace to standardOut
+		nodeAddr = new byte[2] of #0
+		nodeAddr[0] := #1
+		nodeAddr[1] := #0
+		send nodeAddr on radioSetNodeAddress		
+	}
+		
+	behaviour {
+		// get packet
+		receive packet from radioChan
+		// do something with packet
+		project packet.payload as something onto
+			Reading : { 
+				reading = something 
+				send(any("\nGot ")) on trace
+				printReading(reading, trace)
+				send(any(" from ")) on trace
+				send(any(packet.addr[0])) on trace
+				send(any(".")) on trace
+				send(any(packet.addr[1])) on trace
+			}
+			default : { }
+	}
+} 
+
+
+rr = new RucReceiver()
+

@@ -1,0 +1,45 @@
+/*
+Testing the Rtimer component
+*
+*
+*
+*
+**** NB need to remove the duplicate channel stuff!!!
+*/
+
+
+type testI is interface(in bool timerTick ; out rtimerReq timerReq)
+
+component test presents testI{
+
+	id = 0
+	req = new rtimerReq(timerTick, 1000.0)
+	
+	constructor(integer a){ 
+		id := a
+		
+	}
+	
+	behaviour{
+	
+		printInt(id)
+		printString(": Start Timer\n")
+		//setRtimer(timer, 1000.0)
+		
+		send req on timerReq
+		
+		receive tick from timerTick
+	
+	}
+}
+/***************************************************************************/
+alpha = new test(1)
+beta = new test(2)
+gamma = new test(3)
+delta = new test(4)
+
+connect alpha.timerReq to rtimer.request
+connect beta.timerReq to rtimer.request
+connect gamma.timerReq to rtimer.request
+connect delta.timerReq to rtimer.request
+

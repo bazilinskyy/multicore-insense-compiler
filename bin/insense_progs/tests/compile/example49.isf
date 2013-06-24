@@ -1,0 +1,32 @@
+// Tests match, receive etc. in simple real example
+
+type foo is interface( in integer input; out string trace; in integer ticks )
+
+component Receiver presents foo  {
+
+	a = 0
+	b = ""
+	
+	proc f( integer a ) : integer {
+		return 3
+	}
+	
+	constructor() {
+	}
+	
+	
+	behaviour {
+		receive tick from ticks
+		receive somedata from input
+		send "OK" on trace
+		a := f(7)
+	}
+}
+
+
+
+
+
+
+
+

@@ -1,0 +1,173 @@
+/*
+Node 0 (Sink) Query execution plan for simple select query with a buffering factor of 3
+
+Query finds unoccupied rooms with a high temperature
+
+ SELECT RSTREAM Rooms.id, Rooms.temp
+    FROM Rooms[NOW]
+       where temp > 30
+         and light < 100;
+*/
+
+
+// Definitions of the tuple types 
+type RoomTuple is struct(integer evalEpoch; integer id ; real temp)
+type NoRoomTuple is struct(integer evalEpoch)  // I really didn't want to do this, he forced me !!!!
+
+
+proc printTuple(string s; RoomTuple t; out any chan){
+	send(any("\n")) on chan
+	send (any(s)) on chan
+	send (any(" tuple: (epoch=")) on chan
+	send (any(t.evalEpoch)) on chan
+	send (any(", id=")) on chan
+	send (any(t.id)) on chan
+	send (any(", temp=")) on chan
+	send (any(t.temp)) on chan
+	send (any(")")) on chan
+}
+
+
+
+type IReceiver is interface(in RucRadioData radioChan ; out RoomTuple pushTupleChan; out NoRoomTuple pushNoTupleChan; out any trace);
+
+component Receiver presents IReceiver {
+	
+	constructor(){}
+	
+	behaviour{
+		roomTupleToSend = new RoomTuple(0, 0, 0.0)
+		noRoomTupleToSend = new NoRoomTuple(0)
+		receive radioPacket from radioChan
+		payload = radioPacket.payload
+		project payload as val onto
+			RoomTuple : {
+				roomTupleToSend := val 
+				send roomTupleToSend on pushTupleChan
+				//printTuple("Receiver project roomtuple", roomTupleToSend, trace)
+			}
+			NoRoomTuple : {
+				noRoomTupleToSend := val
+				send noRoomTupleToSend on pushNoTupleChan
+			}
+			default : {
+				
+			}
+	}
+}
+
+
+// The RoomBuffer component is responsible for buffering and sending buffered data to the Deliver component. 
+
+type IRoomBuffer is interface (in RoomTuple receiveTupleChan; in NoRoomTuple receiveNoTupleChan; out RoomTuple pushTupleChan; 
+			out NoRoomTuple pushNoTupleChan ; out any trace);
+
+component RoomBuffer presents IRoomBuffer {
+
+	baseEpoch = 0   // lowest epoch number of tuples in this buffer  
+
+	dummyTuple = new RoomTuple(0, 0, 0.0)		//just for padding purposes
+	buffer = new RoomTuple[3][2] of dummyTuple; //buffering factor = 3, num sub-streams = 1
+
+	
+	tuplesPos = new integer[3] of 0  		    // the position in the buffer array of the next tuple in the array, on a per-epoch basis
+	tuplesAccountedFor = new integer[3] of 0 	// number of tuples accounted for each epoch
+
+	constructor() {
+	}
+	
+	behaviour{
+		epoch = -1
+		
+		select {
+			receive tuple from receiveTupleChan : {
+				epoch := tuple.evalEpoch % 3;
+				buffer[epoch][tuplesPos[epoch]] := tuple;
+				tuplesPos[epoch] := tuplesPos[epoch] + 1;
+				tuplesAccountedFor[epoch] := tuplesAccountedFor[epoch] + 1;
+			}
+			receive noRoomTuple from receiveNoTupleChan : {
+				epoch := noRoomTuple.evalEpoch % 3;
+				tuplesAccountedFor[epoch] := tuplesAccountedFor[epoch] + 1;
+			}
+		}
+
+		allTuplesAccountedFor = true;
+		for epochCount = 0 .. 2 do {
+			if tuplesAccountedFor[epochCount] < 2 then { // 2 == n.o. substreams
+				allTuplesAccountedFor := false; // need assignment to allTuplesAccountedFor not decl of new var // break JL NOTE: no break at present
+			}
+		}
+			
+		tupleToSend = dummyTuple // ************ added to avoid CODE GEN issue 
+		noRoomPushTuple = new NoRoomTuple(0)
+		if allTuplesAccountedFor then {
+			for epochCount2 = 0 .. 2 do {
+				if tuplesPos[epochCount2] > 0 then {
+					//send all tuples for that epoch
+					for subStreamCount = 0 .. tuplesPos[epochCount2]-1 : 1 do {
+						tupleToSend := buffer[epochCount2][subStreamCount]
+						send tupleToSend on pushTupleChan
+						//printTuple("Buffer send to deliver", tupleToSend, trace)
+					}
+				} else {
+					//no tuples for that epoch
+					noRoomPushTuple.evalEpoch := baseEpoch+epochCount2
+					send noRoomPushTuple on pushNoTupleChan;
+				}
+
+				//reset arrays for next iteration of component behaviour
+				tuplesPos[epochCount2] := 0;
+				tuplesAccountedFor[epochCount2] := 0
+			}
+			baseEpoch := baseEpoch + 3; //increase base epoch by buffering factor
+		}
+	}
+}
+
+
+type IDeliver is interface(in RoomTuple receiveTupleChan; in NoRoomTuple receiveNoTupleChan; out any output);
+
+component Deliver presents IDeliver {
+
+	constructor() {	
+	}
+		
+	behaviour {
+	    // to fix CGEN error declare a join tuple outside select to force inclusion of header
+		select {
+			receive roomTuple from receiveTupleChan : {
+				// send text+readings in struct on stdout
+				send (any("\nepoch =")) on output
+				send (any(roomTuple.evalEpoch)) on output
+				send (any("\tid = ")) on output
+				send (any(roomTuple.id)) on output
+				send (any("\ttemp = ")) on output
+				send (any(roomTuple.temp)) on output
+			}
+			receive noRoomTuple from receiveNoTupleChan : {
+				send (any("no tuples for epoch = ")) on output
+				send (any(noRoomTuple.evalEpoch)) on output
+			}
+		}
+	}
+}
+
+
+//components
+
+receiver = new Receiver()
+roomBuffer = new RoomBuffer()
+deliver = new Deliver()
+
+//connecting components
+connect receiver.radioChan to rucRadioIn.iochannel
+connect receiver.pushTupleChan to roomBuffer.receiveTupleChan
+connect receiver.pushNoTupleChan to roomBuffer.receiveNoTupleChan
+connect receiver.trace to standardOut
+
+connect roomBuffer.pushTupleChan to deliver.receiveTupleChan
+connect roomBuffer.pushNoTupleChan to deliver.receiveNoTupleChan
+connect roomBuffer.trace to standardOut
+
+connect deliver.output to standardOut

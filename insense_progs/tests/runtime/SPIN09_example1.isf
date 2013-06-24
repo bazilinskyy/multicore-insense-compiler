@@ -1,0 +1,73 @@
+
+type t1 is interface (in bool ticks ; out bool request ; in real temp ; out real output)
+type t2 is interface (in real input ; out real output)
+type t3 is interface (in real input ; out any output)
+
+
+component TimedTempAcquirer presents t1 {
+	constructor() {	}
+		
+	behaviour {
+		receive tick from ticks
+		send true on request
+		receive reading from temp
+		send reading on output
+	}
+} 
+
+component TempAverager presents t2 {
+
+	store = new real[4] of 0.0
+	index = 0
+	
+	constructor() {	}
+		
+	behaviour {
+		receive next from input
+		store[index] := next
+		index := index + 1
+		if index >= store.length then {
+			send avgRealArray(store) on output
+			index := 0
+		}
+	}
+} 
+
+
+component TempLogger presents t3 {
+
+	constructor() {	}
+		
+	behaviour {
+		receive avg from input
+		send (any("\nAverage temp reading: ")) on output
+		send (any(avg)) on output
+	}
+} 
+
+// Insert for testing
+//type trace is interface (out any trace)
+// component TempAverager presents t2, trace { ...
+// ...
+//			send any("\n") on trace
+//			for i = 0 .. store.length-1 do{
+//				send any(" ") on trace
+//				send any(store[i]) on trace
+//			}
+// ...
+//connect averager.trace to standardOut
+  
+
+
+acquirer = new TimedTempAcquirer()
+averager = new TempAverager()
+logger = new TempLogger()
+
+connect acquirer.output to averager.input
+connect averager.output to logger.input
+
+
+connect acquirer.request to lightHumidTempSensor.tempRequest
+connect acquirer.temp to lightHumidTempSensor.tempOutput
+periodicEnSchedule(acquirer.ticks, 1)
+connect logger.output to standardOut

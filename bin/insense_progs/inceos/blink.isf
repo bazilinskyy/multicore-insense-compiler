@@ -1,0 +1,53 @@
+/**
+* Upon a successful burn dude, you should see LED0 flashing with a period of every
+* 200ms, and LED1 and LED2 flashing in unison with a period of 1000ms.
+*/
+
+
+type blinkI is interface (	in bool timerRecv	)
+	
+	
+type ledType is enum (red, green, blue, other)
+
+	
+component blink presents blinkI {
+
+	timeout = 0.0
+	led = other
+	state = true
+
+	constructor(ledType colour ; real duration) {
+		timeout := duration
+		led := colour
+		
+		setTimer(timerRecv , timeout , true)
+	}
+	
+	
+	behaviour {
+	
+		
+		receive tick from timerRecv
+		
+		if (led == red) then{
+			setRedLedPower(state)
+			state := !state
+		}
+		
+		if (led == green) then{
+			setGreenLedPower(state)
+			state := !state
+		}
+		
+		if (led == blue) then{
+			setBlueLedPower(state)
+			state := !state
+		}
+	}
+}
+/**********************************************************************/
+r = new blink(red, 0.25)
+g = new blink(green, 0.5)
+b = new blink(blue, 1.0)
+
+

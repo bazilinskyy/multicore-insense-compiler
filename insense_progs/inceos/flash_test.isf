@@ -1,0 +1,66 @@
+/*
+Testing the flash component
+*
+*
+*
+*
+*/
+
+
+type testI is interface(out readStruct readChan ; 
+						out writeStruct writeChan ; in integer[] writeReply ;
+						out eraseStruct eraseChan )
+
+component test presents testI{
+
+	offset = $0
+	len = $10
+	
+	readBuffer = new integer[10] of 0
+	read = new readStruct(writeReply,readBuffer, offset)
+	
+	buffer = new integer[10] of 0
+	write = new writeStruct(buffer, offset)
+	
+	erase = new eraseStruct(len , offset )
+	
+	constructor(){}
+	
+	behaviour{
+	
+		printString("fill buffer\n")
+
+		for i = 1 .. buffer.length-1 do {
+			buffer[i] := i
+		}
+		
+		printString("write something to storage\n")
+		send write on writeChan
+		
+		printString("read something from storage\n")
+		
+		send read on readChan 
+		receive buf from writeReply
+		
+		
+		printString("buf : ")
+		for i = 1 .. buf.length-1 do {
+			printInt(buf[i])
+			printString(" , ")
+		}
+		printString("\n")
+		
+		printString("erase something from storage\n")
+		
+		send erase on eraseChan
+	
+	
+	}
+}
+/***************************************************************************/
+alpha = new test()
+
+connect alpha.readChan to storage.readReq
+connect alpha.writeChan to storage.writeReq
+connect alpha.eraseChan to storage.eraseReq
+

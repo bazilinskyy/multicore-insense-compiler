@@ -1,0 +1,64 @@
+// Simple Insense program that receives a data packet 
+// containing the sender's node address and soem data
+
+type MyPacket is struct (unsigned addr ; unsigned data)
+
+proc printMyPacket(MyPacket p){
+	printString("(")
+	printUnsignedInt(p.addr)
+	printString(", ")
+	printUnsignedInt(p.data)
+	printString(")")
+}
+
+// Interface for Receiver
+type IReceive is interface ( in RadioPacket radioReceive ; out RadioPacket unicastSend)
+
+// Receiver component
+component Receive presents IReceive {
+	
+	count = $0
+	thisNodeAddr = $0
+	
+	proc unicastReply(unsigned addr){
+		myPayload = new MyPacket(thisNodeAddr, count)
+		printUnsignedInt(thisNodeAddr)
+		printString(": unicast reply to ")
+		printUnsignedInt(addr)
+		printString(" with reply packet ")
+		printMyPacket(myPayload)
+		printString("\n")
+		packet = new RadioPacket(addr, any(myPayload))
+		send packet on unicastSend
+		count := count + $1
+	}
+	
+	proc processIncomingPacket(RadioPacket packet){
+		printUnsignedInt(thisNodeAddr)
+		printString(": got packet from node ")
+		printUnsignedInt(packet.addr)
+		printString(" with data ")
+		project packet.payload as value onto
+			MyPacket: { 
+				printMyPacket( value ) 
+				printString("\n")
+				unicastReply( value.addr )
+			}
+			default : { printString( "???\n" ) }
+	}
+
+	
+	constructor() {
+		thisNodeAddr := getNodeAddress()
+	}
+	
+	behaviour {
+		// wait for packet from Radio
+		receive packet from radioReceive
+		processIncomingPacket(packet)		
+	}
+} 
+
+tr = new Receive()
+connect tr.radioReceive to radio.received
+connect tr.unicastSend to radio.unicastSend

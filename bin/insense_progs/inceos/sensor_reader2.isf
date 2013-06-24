@@ -1,0 +1,44 @@
+// Simple Insense program requesting sensor readings from the sensors
+// This program uses 4 SensorReader component instances.
+// Each componetn instance is wired up to a different sensor.
+// This program demonstrates the pre-emptive nature of InceOS in 
+// scheduling the various component instances.
+
+// Interface for Light Sensor Reader
+type ISensorReader is interface ( out bool requestChan ; in integer valueChan )
+
+// Light Sensor Reader component
+component SensorReader presents ISensorReader {
+	
+	mesg = ""
+	
+	constructor(string s) {
+		mesg := s
+	}
+	
+	behaviour {
+		// get solar sensor reading
+		send true on requestChan
+		receive reading from valueChan
+		printString(mesg)
+		printString(" got reading: ")
+		printInt(reading)
+		printString("\n")
+	}
+} 
+
+solar = new SensorReader("solar")
+connect solar.requestChan to sensors.solarRequest
+connect solar.valueChan to sensors.solarOut
+
+photo = new SensorReader("photo")
+connect photo.requestChan to sensors.photoRequest
+connect photo.valueChan to sensors.photoOut
+
+temp = new SensorReader("temp")
+connect temp.requestChan to sensors.tempRequest
+connect temp.valueChan to sensors.tempOut
+
+humid = new SensorReader("humid")
+connect humid.requestChan to sensors.humidRequest
+connect humid.valueChan to sensors.humidOut

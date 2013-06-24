@@ -1,0 +1,24 @@
+// Tests old syntax for functions
+
+type foo is interface( in integer input; out string trace )
+type chan is in integer
+
+component Receiver presents foo  {
+
+	a = 0
+
+	constructor() {}
+	
+	behaviour {
+		a := 7
+	 }
+	
+}
+
+
+
+
+
+
+
+

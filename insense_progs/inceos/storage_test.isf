@@ -1,0 +1,39 @@
+/*
+* Insense app to test the storage component provided by InceOS
+*/
+
+proc createArray() : integer[] {
+	a = new integer[10] of 1
+	
+	return a
+}
+
+type Itest is interface( out integer[] writeChan)
+
+component test presents Itest {
+
+	a = new integer[10] of 1
+	constructor(){}
+	
+	behaviour{
+		send a on writeChan
+		send createArray() on writeChan
+		for i = 0 .. 9 do {
+			a[i] := a[i] + i
+		}
+	}
+}
+
+type Iother is interface(in integer[] inChan)
+component other presents Iother{
+	constructor(){}
+	
+	behaviour{
+	
+		receive x from inChan
+	}
+}
+t = new test()
+o = new other()
+
+connect t.writeChan to o.inChan

@@ -1,0 +1,27 @@
+// Test complexity on RHS 
+
+type t1 is interface( out integer output )
+
+component trickyRHS presents t1 {
+	
+	FFF = 0;
+	p = 7
+	
+	constructor() {
+	}
+	
+	behaviour {
+		
+		EEE = if p == 0 then
+		   if p == 1 then 5
+		   	 else if p == 3 then 2
+		   	 	else 4
+		pp = 7
+			
+
+	}
+}
+
+ 
+
+

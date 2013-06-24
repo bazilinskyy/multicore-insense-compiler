@@ -1,0 +1,40 @@
+// Simple Hello World Insense program
+
+// Interface for Hello component
+type IHello is interface ( out integer output )
+
+// Hello World component
+component Hello presents IHello {
+
+	count = 0
+
+	constructor() {}
+		
+	behaviour {
+		printAny(any("\nHello World "))
+		printAny(any(count))
+		send count on output
+		count := count + 1
+	}
+} 
+
+type ILimiter is interface ( in integer input )
+component Limiter presents ILimiter {
+	
+	limit = 0
+	hello = new Hello()
+	
+	constructor(integer number){ 
+		limit := number
+		connect input to hello.output
+	}
+	
+	behaviour {
+		receive count from input
+		if count > limit then
+			stop hello
+	}
+}
+
+limiter = new Limiter(5)
+

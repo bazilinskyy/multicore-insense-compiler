@@ -1,0 +1,42 @@
+// Tests multiple component definition
+
+ type bobby is interface( in integer bobber )
+ 
+component Radio presents bobby {
+	
+	size = 0;
+	
+	constructor() {
+	}
+	
+	constructor( in integer startticks ) {
+		ticker := startticks;
+	}
+	
+	constructor( in integer startticks; integer framesize ) { 
+		ticker := startticks;
+	}	
+	
+	behaviour {
+		
+	}
+}
+
+ 
+ component Bobber presents bobby {
+	
+	size = 0;
+	
+	constructor() {
+	}
+	
+	behaviour {
+		
+	}
+}
+
+bob = new Radio();
+
+
+
+

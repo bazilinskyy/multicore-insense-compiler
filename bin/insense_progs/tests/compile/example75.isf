@@ -1,0 +1,47 @@
+// Dharini's change effector
+
+type changeFunction is proc(integer; integer) : integer
+
+type generator is interface( out changeFunction f1 )
+type changeEffector is interface( in changeFunction f1 )
+
+component Subject presents generator {
+	
+	proc double ( integer x, y ): integer {
+		return x + y
+	} 
+	
+	constructor() {
+	}	
+	
+	behaviour {
+		send double on f1
+	}
+}
+
+
+component Changed presents changeEffector {
+		
+	proc dosomething ( integer x, y ): integer {
+		return x * y
+	}
+	
+	constructor() {
+	}
+	
+	behaviour {
+		y = dosomething( 2, 3 ) // will call dosomething and give 6
+		receive changefun from f1
+		z = changefun
+		y := z( 2, 3 ) // will call the changefun and give 5
+	}
+}
+
+x = new Subject()
+y = new Changed()
+connect x.f1 to y.f1
+
+
+ 
+
+

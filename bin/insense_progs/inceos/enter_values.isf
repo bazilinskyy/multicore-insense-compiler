@@ -1,0 +1,32 @@
+	
+type IProg is interface( )
+	
+component Prog presents IProg {
+
+	constructor(){
+	}
+	
+	behaviour {
+		printString("\nPlease enter a string\n");
+		s = getString()
+		printString("Please enter an integer\n");
+		i = parseInt(getString())
+		printString("Please enter an unsigned\n");
+		u = parseUnsignedInt(getString())
+		printString("Please enter a real\n");
+		r = parseReal(getString())
+		printString("string: ")
+		printString(s)
+		printString("\ninteger: ")
+		printInt(i)
+		printString("\nunsigned: ")
+		printUnsignedInt(u)
+		printString("\nreal: ")
+		printReal(r)
+	}
+}
+
+// Insense main
+
+prog = new Prog()
+

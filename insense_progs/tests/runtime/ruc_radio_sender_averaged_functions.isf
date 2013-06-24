@@ -1,0 +1,148 @@
+/* 
+ * ruc_radio_sender_averaged_functions.isf
+ * 
+ * Insense program to gather light, temp, and humidity readings, average and buffer them and 
+ * send them to a sink node when the buffer is full (once every 5 minutes)
+ * 
+ * The program uses a single user-defined component and a few procedures. The component makes use the
+ * scheduler component defined in the run-time to allow power-management of the CPU to be done. It also
+ * explicitly turns the radio on and off as this node is not required to receive any data. 
+ * 
+ * @author jonl
+ * 
+ */
+
+
+
+// type for sensor readings
+type Reading is struct(integer cycle ; integer solar ; real temp ; real humid)
+
+
+// Interface for Sender
+type IRucSender is interface (out RadioPacket radioChan ; in bool radioSuccessChan)
+
+// (Semi)-Reliable UniCast (RUC) radio sender component
+// This component measures solar, temp and humidity every dutyCycle seconds,
+// dutyCycle is a constructor parameter, it buffers 5 readings and then 
+// transmits the 5 readings to a sink node. 
+// This component sets the node address to 2.0 and attempts to send to a sink 1.0.
+// The red LED indicates that an ACK was not received from the sink (possible transmission error).
+// The green LED flashes when a timed cycle begins.
+// The blue LED flashes when the buffer is full
+component RucSender presents IRucSender, ISchedulable{
+
+	cycle = 1                                              // cycle counter, used to timestamp readings
+	dutyCycle = 0                                          // the duty cycle in seconds
+	dummyReading = new Reading(0,0,0.0,0.0)                // dummy reading to use as initialiser for the buffer                
+	buffer = new Reading[5] of dummyReading                // buffer of 5 Reading structs
+	index = 0                                              // buffer index variable
+
+	avgCounter = 0                                         // counter for averager
+	avgWindowSize = 0                                      // window size for averager
+	avgSolar = 0.0                                         // average solar value
+	avgTemp = 0.0                                          // average temperature value
+	avgHumid = 0.0                                         // average humidity value
+
+	firstRun = true                                        // boolean to indicate whether this is the first run of the behaviour loop
+	nodeAddr = new byte[2] of #0                           // byte array to hold this node's address
+	destAddr = new byte[2] of #0                           // byte array to hold the destination (sink) node's address
+		
+	// procedure to print a Reading struct data 
+	proc printReading(Reading data ; bool endAvg){ 
+		if endAvg then {
+			printAny(any("\ncycle: "))
+			printAny(any(data.cycle))
+		} else {
+			printAny(any("\nsample: "))
+			printAny(any(avgCounter))
+		}
+		printAny(any(", solar="))
+		printAny(any(data.solar))
+		printAny(any(", temp="))
+		printAny(any(data.temp))
+		printAny(any(", humid="))
+		printAny(any(data.humid))
+	}
+	
+	proc sendBuffer(){                                     // procedure to send (flush) the buffer to the radio
+		setRadioPower(true)                                // turn on radio
+		payload = (any(buffer))                            // construct packet payload
+		packet = new RadioPacket(destAddr, payload)        // build packet
+		send packet on radioChan                           // send packet
+		receive success from radioSuccessChan              // wait for success or timeout 
+		setRadioPower(false)                               // turn off radio after send (incl. potential retries)
+		setRedLedPower(!success)                           // turn on RED if we didn't get ACK from sink node
+	}
+
+	proc getReading() : Reading {                          // procedure to get a Reading from sensors
+		// put readings in Reading struct
+		reading = new Reading(cycle, getSolarSensorReading(), getTemperatureSensorReading(), getHumiditySensorReading())
+		printReading(reading, false)                       // print out reading
+		return reading                                     // return the Reading struct
+	}
+
+	proc resetAverages(){
+		avgCounter := 0 
+		avgSolar := 0.0                                    // reset all the average values
+		avgTemp := 0.0
+		avgHumid := 0.0
+	}
+	
+	proc updateAverages(Reading reading){
+		avgSolar := avgSolar + 1.0*reading.solar / avgWindowSize // add reading's 
+		avgTemp := avgTemp + reading.temp / avgWindowSize   // values to average
+		avgHumid := avgHumid + reading.humid / avgWindowSize
+	}
+	
+	proc getAverageReading() : Reading {                     // construct a reading from the average values
+		avgReading = new Reading (cycle, realToInt(avgSolar), avgTemp, avgHumid)
+		return avgReading
+	}
+	
+	constructor(integer ds ; integer windowSize) {         // constructor for sender component, takes duty cycle (ds) and window size parameter
+		// make connections
+		connect radioChan to radioOut.runicast
+		connect radioSuccessChan to radioOut.success
+
+		dutyCycle := ds                                    // set duty cycle time
+		avgWindowSize := windowSize                        // set averager window size
+		nodeAddr[0] := #2 ; nodeAddr[1] := #0              // set this node's address
+		destAddr[0] := #1 ; destAddr[1] := #0              // set sink node's address
+		periodicEnSchedule( inTicksChan, dutyCycle )       // setup ticker for given duty cycle
+		//setRadioNodeAddress(nodeAddr)                      // set sender's node address
+		setRadioPower(false)                               // turn off radio until needed
+	}
+		
+	behaviour {                                            // main behaviour loop for component
+		receive tick from inTicksChan                      // wait for tick from timer
+		setGreenLedPower(true)                             // on-device feedback for start after tick 		
+		reading = getReading()                             // get next reading
+		updateAverages(reading)                            // update the averages
+		avgCounter := avgCounter + 1                       // increment average window counter
+		if avgCounter == avgWindowSize then {              // we have reached end of averaging window
+			setBlueLedPower(true)                          // on-device feedback for averaging
+			avgReading = getAverageReading()               // get average reading
+			buffer[index] := avgReading                    // put average Reading into buffer at current index position
+			printReading(avgReading, true)                 // print out average on trace
+			resetAverages()                                // reset all the averages
+			index := index + 1                             // increment index
+			if index == buffer.length then {               // if buffer is full
+				sendBuffer()                               // send (flush) buffer over radio
+				index := 0                                 // reset buffer index 
+			}
+			cycle := cycle + 1                             // increment cycle counter
+			setBlueLedPower(false)                         // on-device feedback for end of averaging
+		}
+		setGreenLedPower(false)                            // on-device feedback for end of tick cycle
+	}
+} 
+
+// instantiate component with dutyCycle=10 i.e. 10 seconds
+// and averaging window size of 6, so one average reading every 
+// minute based on 6 samples per minute, with a buffer size of 5, send
+// buffer every 5 minutes
+rs = new RucSender(10, 6) 
+//rs = new RucSender(2, 2) // test config send buffer 20 seconds
+
+
+

@@ -1,0 +1,58 @@
+
+type Reading is struct(integer cycle ; integer solar ; real temp)
+
+// Interface for Unicast (UC) radio receiver component
+type IUcReceiver is interface (in RadioPacket radioChan)
+
+// Unicast (UC) radio receiver component
+component UcReceiver presents IUcReceiver {
+
+	nodeAddr = new byte[2] of #0
+	
+	
+	proc printAddress(byte[] addr){
+		printAny(any(addr[0]))
+		printAny(any("."))
+		printAny(any(addr[1]))		
+	}
+	
+	proc printOutput(Reading data ; byte[] addr){
+		printAny(any("\nGot " ))
+		printAny(any("reading = ( cycle="))
+		printAny(any(data.cycle))
+		printAny(any(", solar="))
+		printAny(any(data.solar))
+		printAny(any(", temp="))
+		printAny(any(data.temp))
+		printAny(any(" ) from "))
+		printAddress(addr)
+	}
+
+	
+	constructor() {	
+		nodeAddr[0] := #1
+		// set this node's address
+		setRadioNodeAddress(nodeAddr)
+		// get node address back from radio to test that set worked 
+		nodeAddr := getRadioNodeAddress()
+		printAny(any("\n Set node addresss to "))
+		printAddress(nodeAddr)
+	}
+		
+	behaviour {
+		// get packet
+		receive packet from radioChan
+		// do something with packet
+		project packet.payload as something onto
+			Reading : { 
+				reading = something 
+				printOutput(reading, packet.addr)
+			}
+			default : { }
+	}
+} 
+
+
+ur = new UcReceiver()
+
+connect ur.radioChan to radioIn.received

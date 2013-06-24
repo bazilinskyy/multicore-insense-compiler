@@ -1,0 +1,29 @@
+// Tests enums
+
+type colour is enum( red,green,blue )
+
+type fish is interface( out string stdout )
+
+component Radio presents fish {
+	
+	i = 1.0 / 7.0
+	
+	constructor() {
+	    xx = 3
+	    yy = xx
+		a = blue
+		b = red
+		b := a
+		a := orange
+		x = new in integer
+		
+	}
+	
+	behaviour {
+		
+	}
+}
+
+
+
+

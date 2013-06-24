@@ -1,0 +1,65 @@
+/*
+* What would network dicovery look like
+*/
+type senseI is interface (in bool timerRecv ; out bool tempReq ; in integer tempVal ; out integer to_sink)
+
+component sense presents senseI {
+
+
+    constructor(real time){
+    		
+	publish(to_sink)
+    }
+
+    behaviour {
+
+	setTimer(timerRecv , time , false)
+        receive tick from timerRecv
+
+        send true on tempReq
+        receive reading from tempVal
+
+	try {
+		send reading on to_sink
+	}
+	except send_error_exception{
+		/*Handel this as you like*/
+		
+	}
+    }
+}
+
+s =  new sense(1)
+
+connect s.tempReq   to sensors.batteryRequest
+connect s.tempVal to sensors.batteryOut
+/***********************************************/
+type sinkI is interface(in integer sink)
+
+component{
+	sensors = new integer[]
+
+	constructor() {
+		sensors = find channels called "to_sink"
+
+		for i = 0 .. sensors.length - 1 do {
+			connect sink to sensors.to_sink
+		}
+	}
+	behaviour{	
+		
+		try {
+			receive data from sink
+		}
+		except receive_error_exception{
+			/*Handel this as you like*/
+		}
+
+		/* process values*/	
+	}
+}
+
+
+/*
+
+We could have a remote channel type, this would give us any extra information that we need that a normal channel does not :  location, node that it came from

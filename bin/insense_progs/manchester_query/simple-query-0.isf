@@ -1,0 +1,369 @@
+// Query execution plan for simple join query with a buffering factor of 3
+
+
+// Definitions of the tuple types 
+type InflowTuple is struct(integer evalEpoch ; integer epoch ; real humidityVal)
+type OutflowTuple is struct(integer evalEpoch; integer epoch; real temperatureVal)
+type JoinTuple is struct(integer evalEpoch; integer epoch; real humidityVal; real temperatureVal) 
+
+
+//The Rx component is responsible for receiving tuples from a particular node and putting them in the corresponding buffer,
+//depending on the fragment they are from.
+
+
+type IReceive is interface(in any radioChannel ; out InflowTuple pushInflowTuple; out integer pushNoInflowTuple; out OutflowTuple pushOutflowTuple; out integer pushNoOutflowTuple);
+
+component Receive presents IReceive {
+	constructor() {
+	}
+	behaviour {
+		outflowTuple = new OutflowTuple(-1, -1, -1.0)
+		inflowTuple = new InflowTuple(-1, -1, -1.0)
+		receive radioPacket from radioChannel
+		project radioPacket as stuff onto
+			InflowTuple : { 
+				inflowTuple := stuff
+				send inflowTuple on pushInflowTuple
+			}
+			OutflowTuple : {
+				outflowTuple := stuff
+				send outflowTuple on pushOutflowTuple
+			}
+			default : {
+				//x = 1
+			}
+	}
+}
+
+//This component ensures all tuples are accounted for before sending them on
+type IInflowBuffer is interface (in InflowTuple receiveTuple; in integer receiveNoTuple; out InflowTuple pushTuple; out integer pushNoTuple);
+type IOutflowBuffer is interface (in OutflowTuple receiveTuple; in integer receiveNoTuple; out OutflowTuple pushTuple; out integer pushNoTuple);
+
+component F3Buffer0 presents IInflowBuffer {
+	baseEpoch = 0
+	tuplesPos = new integer[3] of 0  //the position of the next tuple in the array, on a per-epoch basis
+	tuplesAccountedFor = new integer[3] of 0 //number of tuples accounted for, on a per-epoch basis
+	dummyTuple = new InflowTuple(0, 0, 0.0)
+	buffer = new InflowTuple[3][2] of dummyTuple;
+
+	constructor() {
+	}
+	behaviour{
+		e = 0
+		select {
+			receive tuple from receiveTuple : {
+				e := tuple.epoch % 3;
+				buffer[e][tuplesPos[e]] := tuple;
+				tuplesPos[e] := tuplesPos[e] + 1;
+				tuplesAccountedFor[e] := tuplesAccountedFor[e] + 1;
+			}
+			receive noTupleEpoch from receiveNoTuple : {
+				e := tuple.epoch % 3;
+				tuplesAccountedFor[e] := tuplesAccountedFor[e] + 1;
+			}
+		}
+
+		allTuplesAccountedFor = true;
+		for c1 = 0 .. 2 do {
+			if tuplesAccountedFor[c1] != 2 then {
+			  //allTuplesAccountFor = false; // JL Nooooooooooo, you meant
+				allTuplesAccountedFor := false;
+				// break; JL NOTE: no break at present
+			}
+		}
+			
+		tupleToSend = dummyTuple // ************ added to avoid CODE GEN issue 
+		if allTuplesAccountedFor == true then {
+			for i = 0 .. 2 : 1 do {
+				if tuplesPos[i] > 0 then {
+					//send all tuples for that epoch
+					for j = 0 .. tuplesPos[i]-1 : 1 do {
+						tupleToSend := buffer[i][j]
+						//send buffer[i][j] on pushTuple; // ******************** CODE GEN PROBLEM ***********************
+						send tupleToSend on pushTuple
+					}
+				} else {
+					//no tuples for that epoch
+					send (baseEpoch+i) on pushNoTuple;
+				}
+
+				//reset arrays for next iteration of component behaviour
+				tuplesPos[i] := 0;
+				//tuplesAccountedFor = 0; // JL did you mean
+				tuplesAccountedFor[i] := 0
+			}
+			baseEpoch := baseEpoch + 3;
+		}
+	}
+}
+
+component F2Buffer0 presents IOutflowBuffer {
+	baseEpoch = 0
+	tuplesPos = new integer[3] of 0  //the position of the next tuple in the array, on a per-epoch basis
+	tuplesAccountedFor = new integer[3] of 0 //number of tuples accounted for, on a per-epoch basis
+	dummyTuple = new OutflowTuple(0, 0, 0.0)
+	buffer = new OutflowTuple[3][1] of dummyTuple;
+
+	constructor() {
+	}
+	behaviour{
+		e = 0
+		select {
+			receive tuple from receiveTuple : {
+				e := tuple.epoch % 3;
+				buffer[e][tuplesPos[e]] := tuple;
+				tuplesPos[e] := tuplesPos[e] + 1;
+				tuplesAccountedFor[e] := tuplesAccountedFor[e] + 1;
+			}
+			receive noTupleEpoch from receiveNoTuple : {
+				e := tuple.epoch % 3;
+				tuplesAccountedFor[e] := tuplesAccountedFor[e] + 1;
+			}
+		}
+
+		allTuplesAccountedFor = true;
+		for c1 = 0 .. 2 : 1 do {
+			if tuplesAccountedFor[c1] != 1 then {
+			  // allTuplesAccountFor = false; // JL  Noooooooooooooooo, should be assignment and get name right
+				allTuplesAccountedFor := false;
+				// break; JL NOTE: no break at present
+			}
+		}
+		tupleToSend = dummyTuple // ************ added to avoid CODE GEN issue 			
+		if allTuplesAccountedFor == true then {
+			for i = 0 .. 2 : 1 do {
+				if tuplesPos[i] > 0 then {
+					//send all tuples for that epoch
+					for j = 0 .. tuplesPos[i]-1 : 1 do {
+						tupleToSend := buffer[i][j]
+						//send buffer[i][j] on pushTuple; // ******************** CODE GEN PROBLEM ***********************
+						send tupleToSend on pushTuple
+					}
+				} else {
+					//no tuples for that epoch
+					send (baseEpoch+i) on pushNoTuple;
+				}
+
+				//reset arrays for next iteration of component behaviour
+				tuplesPos[i] := 0;
+				//tuplesAccountedFor = 0; // ******** Noooooooooooo JL you meant 
+				tuplesAccountedFor[i] := 0
+			}
+			baseEpoch := baseEpoch + 3;
+		}
+	}
+}
+
+//Join component
+//takes tuples of type inflow and outflow with the same epoch, and contacatenates them if they meet the join predicates
+//for the example query there are no join predicates so it's basically a cross product
+//we know that when we get a tuple from the next epoch, we can do the join, because of the semantics of the buffer components it is guaranteed that there won't be any more tuples from that epoch.
+
+type IJoin is interface(in InflowTuple receiveLeftTuple; in integer receiveNoLeftTuple; in OutflowTuple receiveRightTuple; in integer receiveNoRightTuple; out JoinTuple pushTuple; out integer pushNoTuple )
+
+component Join0 presents IJoin { 
+
+	currentEpoch = 0;
+	outputProduced = false;
+
+	dummyInflowTuple = new InflowTuple(-1, -1, -1.0); //dummy tuple as null doesn't exist in Insense
+	dummyOutflowTuple = new OutflowTuple(-1, -1, -1.0); //dummy tuple as null doesn't exist in Insense
+	
+	nextEpochLeftTuple = dummyInflowTuple;
+	nextEpochRightTuple = dummyOutflowTuple;
+
+	leftTupleBuffer = new InflowTuple[2] of dummyInflowTuple;
+	leftTupleBufferPos = 0
+	
+	endOfLeftData = false
+	noLeftDataInNextEpoch = false
+	
+	dummyOutTuple = new JoinTuple(-1, -1, -1.0, -1.0);
+	outTuple = dummyOutTuple;
+	
+	endOfRightData = false
+	noRightDataInNextEpoch = false
+	
+	constructor() {
+	} 
+
+
+	behaviour {
+
+	
+		//check if a tuple has already been received for this epoch
+	  // Code gen error
+	  //if (nextEpochLeftTuple.evalEpoch != -1) {
+	        num = nextEpochLeftTuple.evalEpoch
+		if num != 1 then {
+			leftTupleBuffer[leftTupleBufferPos] := nextEpochLeftTuple;
+			leftTupleBufferPos := leftTupleBufferPos + 1;
+			nextEpochLeftTuple := dummyInflowTuple;
+		}
+	
+		//check if indication of no data has already been received for current epoch
+		if noLeftDataInNextEpoch == true then {
+			endOfLeftData := true;
+			noLeftDataInNextEpoch := false;
+		} else {
+			endOfLeftData := false;
+		}
+	
+	
+		for i = 0 .. 1 : 1 do { 
+			if endOfLeftData == false then {
+				select {
+					receive leftTuple from receiveLeftTuple: {
+						if currentEpoch == leftTuple.evalEpoch then {
+							leftTupleBuffer[leftTupleBufferPos] := leftTuple;
+							leftTupleBufferPos := leftTupleBufferPos + 1;
+						} else {
+							nextEpochLeftTuple := leftTuple;
+							endOfLeftData := true;
+						}
+					}
+					receive noLeftTuple from receiveNoLeftTuple: {
+						endOfLeftData := true;
+						if noLeftTuple > currentEpoch then {
+							noLeftDataInNextEpoch := true;
+						}
+					}
+				}
+			}
+		}
+	
+		//check if a tuple has already been received for current epoch
+		outTuple = dummyOutTuple;
+                leftBuffTuple = dummyInflowTuple // avoid CODE GEN error when dereferecing field of struct held in array 
+		if nextEpochRightTuple.evalEpoch!=-1 then {
+			for j = 0 .. (leftTupleBufferPos-1) : 1 do {
+				//outTuple.evalEpoch := leftTupleBuffer[j].evalEpoch
+			        leftBuffTuple := leftTupleBuffer[j] // avoid CGEN error
+				outTuple.evalEpoch := leftBuffTuple.evalEpoch
+				//outTuple.epoch := leftTupleBuffer[j].epoch
+				outTuple.epoch := leftBuffTuple.epoch
+				//outTuple.humidityVal := leftTupleBuffer[j].humidityVal
+				outTuple.humidityVal := leftBuffTuple.humidityVal
+				outTuple.temperatureVal := nextEpochRightTuple.temperatureVal
+				send outTuple on pushTuple;
+				outputProduced := true;
+			}
+
+			nextEpochRightTuple.evalEpoch := -1
+			nextEpochRightTuple.epoch := -1
+			nextEpochRightTuple.temperatureVal := -1.0 
+		}
+	
+		//check if indication of no data has already been received for current epoch
+		if noRightDataInNextEpoch == true then {
+			endOfRightData := true;
+			noRightDataInNextEpoch := false;
+		} else {
+			endOfRightData := false;
+		}	
+		for k = 0 .. 0 : 1 do { //in this case a for loop looks weird, but this depends on the number of right hand side tuples expected.
+			 //it's simpler for for code-generation to always have it a for loop, even if it only executs once
+			if endOfRightData == false then {
+				select {
+					receive rightTuple from receiveRightTuple: {
+						if currentEpoch == rightTuple.evalEpoch then {
+							//TODO: do the join and sent it along the output channel
+							//JoinTuple outTuple = new JoinTuple(evalEpoch, leftTupleBuffer[k].epoch, leftTupleBuffer[k].humidityVal, rightTuple.temperatureVal);
+							//outTuple.evalEpoch := leftTupleBuffer[k].evalEpoch // JL NOTE evalEpoch unknown  
+						  // to avoid CGEN error as above (on deref field in array of structs element)
+						  leftBuffTuple := leftTupleBuffer[k]
+						    outTuple.evalEpoch := leftBuffTuple.evalEpoch
+							outTuple.epoch := leftBuffTuple.epoch
+							outTuple.humidityVal := leftBuffTuple.humidityVal
+							outTuple.temperatureVal := nextEpochRightTuple.temperatureVal
+							send outTuple on pushTuple;
+							outputProduced := true;					
+						} else {
+							nextEpochRightTuple := rightTuple;
+							endOfRightData := true;
+						}
+					}
+					receive noRightTuple from receiveNoRightTuple : {
+						endOfRightData := true;
+						if noRightTuple > currentEpoch then {
+							noRightDataInNextEpoch := true;
+						}
+					}
+				}
+			}
+		}
+	
+		if outputProduced == false then {
+			send currentEpoch on pushNoTuple;
+		}
+	
+		currentEpoch := currentEpoch + 1;
+	}
+} 
+
+
+//deliver component on the sink node
+//receives tuples of a particular type, and writes them to the motes serial port to be displayed on PC
+//assumed to be part of infrastructure, so I will only propose a signature
+
+type IDeliver is interface(in JoinTuple receiveTuple; in integer receiveNoTuple; out any output);
+
+component Deliver0 presents IDeliver {
+
+	time = 0
+	evalTime = 0
+
+	constructor() {	
+	}
+		
+	behaviour {
+	        // to fix CGEN error declare a join tuple outside select to force inclusion of header
+	        dummyJoinTuple = new JoinTuple(-1, -1, -1.0, -1.0)
+		select {
+			receive tuple from receiveTuple : {
+
+				evalTime := tuple.evalEpoch * 5 
+				time := tuple.epoch * 5 
+
+				// send text+readings in struct on stdout
+				send (any("\nevaltime =")) on output
+				send (any(evalTime)) on output
+				send (any("\ttime = ")) on output
+				send (any(time)) on output
+				send (any("\thumidity = ")) on output
+				send (any(tuple.humidityVal)) on output
+				send (any("\ttemperature = ")) on output
+				send (any(tuple.temperatureVal)) on output
+				send (any("\n")) on output
+			}
+			receive noTupleEpoch from receiveNoTuple : {
+				time := noTupleEpoch * 5;
+			
+				send (any("no tuples for evalTime = ")) on output
+				send (any(time)) on output
+			}
+		}
+	}
+}
+
+
+//Components
+
+rx0 = new Rx0();
+f3Buffer0 = new F3Buffer0();
+f2Buffer0 = new F2Buffer0();
+join0 = new Join0();
+deliver0 = new Deliver0();
+
+connect rx0.pushInflowTuple to f3Buffer0.receiveTuple;
+connect rx0.pushNoInflowTuple to f3Buffer0.receiveNoTuple;
+connect rx0.pushOutflowTuple to f2Buffer0.receiveTuple;
+connect rx0.pushNoOutflowTuple to f2Buffer0.receiveNoTuple;
+connect f3Buffer0.pushTuple to join0.receiveLeftTuple;
+connect f3Buffer0.pushNoTuple to join0.receiveNoLeftTuple;
+connect f2Buffer0.pushTuple to join0.receiveRightTuple;
+connect f2Buffer0.pushNoTuple to join0.receiveNoRightTuple;
+connect join0.pushTuple to deliver0.receiveTuple;
+connect join0.pushNoTuple to deliver0.receiveNoTuple;
+
+

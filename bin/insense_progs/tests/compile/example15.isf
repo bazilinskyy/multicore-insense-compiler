@@ -1,0 +1,11 @@
+// Tests function definition and call (error case)
+
+proc fn( integer i,b ) : integer {
+	return i
+}
+
+ii = fn( 3 );
+
+
+
+

@@ -1,0 +1,44 @@
+// Tests connection and disconnection
+
+type foo is interface( in integer ticker,tocker; out integer bob )
+type bah is interface( in integer bobber )
+
+component Connect1 presents foo {
+	
+	size = 0;
+	
+	constructor() {
+	}
+	
+	constructor( in integer startticks ) {
+		ticker := startticks;
+	}
+	
+	behaviour {
+		send 2 on bob
+	}
+}
+ 
+component Connect2 presents bah {
+	
+    size = 0;
+	
+	constructor() {
+	}
+	
+	behaviour {
+		receive x from bobber
+	}
+}
+
+f = new Connect1();
+g = new Connect2();
+connect f.bob to g.bobber;
+disconnect g.bobber
+
+
+
+
+
+
+

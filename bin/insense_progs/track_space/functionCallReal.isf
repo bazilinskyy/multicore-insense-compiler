@@ -1,0 +1,7 @@
+
+proc fooreal(real a, b) : real {
+	return a + b
+}
+
+
+barreal = fooreal(1.0, 2.0)

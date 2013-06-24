@@ -1,0 +1,80 @@
+
+//type SchedulerRequest is struct( out bool outTicksChan ; integer tickTime )
+
+type outTicksChan is out bool
+
+
+//type IScheduler is interface( in SchedulerRequest requestsChan ; in bool rtcTicksChan)
+component Scheduler presents IScheduler {
+
+	// scheduleList = new List of channels and 
+	
+	proc addToScheduleList( SchedulerRequest request ) {
+		// add request to scheduler list
+	}
+	
+	proc sendTicks() {
+		// looks in scheduler list to see if any sends are needed
+		// if they are it does them
+	}
+
+	constructor(){
+	}
+	
+	behaviour {
+		select {
+			receive tick from rtcTicksChan  : { sendTicks() }
+			receive request from requestsChan : { addToScheduleList( request ) }
+		}
+	}
+}
+
+type IRealTimeClock is interface( out bool outTicksChan )
+// component that sends clock signals to the scheduler at a sensible 
+component RealTimeClock presents IRealTimeClock {
+
+	constructor(){}
+	
+	behaviour {
+		// put contiki etimer event wait here for sensible minimum time 
+		send true on outTicksChan
+	}
+}
+
+
+// proc periodicEnSschedule( ISchedulable app ; integer tickTime ; in Request requestsChan ) : outTicksChan {
+// interface type not being dereferenced properly
+proc periodicEnSchedule( in bool appInTicksChan ; integer appTickTime ; in SchedulerRequest schedulerRequestsChan ) {
+		// why is type outTicksChan not accepted here?
+		schedulerOutTicksChan = new out bool                           // new channel on which scheduler is to send ticks to the app 
+		connect appInTicksChan to schedulerOutTicksChan                // connect the app's inTicks channel to the scheduler's outTicks channel
+		appRequest = new SchedulerRequest( schedulerOutTicksChan, appTickTime ) // build app request to send to scheduler
+		procRequestsChan = new out SchedulerRequest                             // set up local procedure channel
+		connect procRequestsChan to schedulerRequestsChan              // connect local procedure channel to the shceduler's requests channel
+		send appRequest on procRequestsChan                            // send app request to scheduler on local procedure channel
+		// 		connect myapp.inTicks to outTicks
+}
+
+//type ISchedulable is interface( in bool inTicksChan )
+component someComponent presents ISchedulable {
+			
+	constructor(){
+	}
+	
+	behaviour {
+		receive tick from inTicksChan
+		// do stuff
+	}
+}
+
+rtclock = new RealTimeClock()
+sched = new Scheduler()
+connect rtclock.outTicksChan to sched.rtcTicksChan
+
+myapp = new someComponent()
+periodicEnSchedule( myapp.inTicksChan, 10, sched.requestsChan )
+
+
+
+
+

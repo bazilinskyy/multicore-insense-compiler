@@ -1,0 +1,161 @@
+/*
+* Basic sensor net grid application
+* Leader broadcasts a request for slaves, a slave replies with its ID.
+* Leader collects sensor data and unicasts to the slave
+* Slave does fast fourier transform on data, finds max and returns this to leader
+* Leader gets work and starts again
+*
+* No attempt to recover missing/lost packets, if this happends there is a time out and try again
+*/
+ 
+//struct used for radio transmission of request and work
+type workPacket is struct (unsigned id ; unsigned workNum ; integer[] work)
+ 
+type replyPacket is struct ( unsigned id ; unsigned workNum ; integer answer )
+ 
+type ackPacket is struct (unsigned id ; bool state)
+ 
+type requestPacket is struct (unsigned id)
+/*------------------------------------------------------------------*/
+proc createReplyPacket (unsigned id ; unsigned dest ; unsigned workNum ; integer ans) : RadioPacket {
+ 
+		r = new replyPacket(id, workNum,  ans)
+		p = new RadioPacket(dest , any(r))
+		return p
+}
+/*------------------------------------------------------------------*/
+proc createWorkPacket (unsigned  dest ; unsigned id ; unsigned workNum ; integer[] work) : RadioPacket {
+ 
+		r = new workPacket(id, workNum,  work)
+        p = new RadioPacket(dest, any(r))
+		return p
+}
+/*------------------------------------------------------------------*/
+proc createRequestPacket (unsigned id ) : requestPacket {
+ 
+		r = new requestPacket(id)
+		return r
+}
+/*------------------------------------------------------------------*/
+proc createAckPacket (unsigned id ; unsigned dest ;bool state ) : RadioPacket {
+ 
+		r = new ackPacket(id, state)
+		p = new RadioPacket(dest , any(r))
+		return p
+}
+/*******************************************************************************/
+//interface for leader
+type leaderI is interface(out any bcast; 
+                          out RadioPacket ucast ;
+                          out bool dataRequest ;
+                          in integer dataReply ;
+                          in integer button ;
+						  in RadioPacket ether ;
+                          in bool timerChan )
+ 
+component leader presents leaderI{
+ 
+    dataNum  = 0
+    num = $0            
+	//The data array
+	data = new integer[10] of 0
+	init = true
+ 
+	constructor(){
+	}
+ 
+	behaviour{
+ 
+ 
+ 			//printString("wait for packet or timeout\n");
+			// Either receive a packet indicating a willing worker node, or timeout and request again
+			select {
+ 
+				receive press from button : {
+					//printString("LEADER: button press\n");
+	            	init := false
+ 
+					//intial request for data
+					req = createRequestPacket(getNodeAddress())
+					setTimer(timerChan, 15.0, false)   
+					send any(req) on bcast
+				}
+ 
+				receive packet from ether : {
+					/* Packet is either 
+					 *		reply from worker 	: collect sensor data and send
+					 *		answer from worker 	: start again
+					 *		request from leader	: reply with node id
+					 *		work from leader	: fourier transform, find max, reply
+					 *		unknown packet		: do nothing go round again and wait for packet or timeout
+					 */
+					project packet.payload as reading onto
+					       workPacket : {
+					       		//printString("work\n");
+								ifft(reading.work, reading.work.length)
+		                              max = 0
+		                              for i = 0 .. reading.work.length-1 do {
+		                                  if reading.work[i] > max then {
+		                                      max := reading.work[i]
+		                                  }
+		                              }
+		                              reply = createReplyPacket(getNodeAddress(),reading.id, reading.workNum, max)
+		                              send reply on ucast
+							}
+							requestPacket : {
+							//printString("request\n");
+								ack = createAckPacket(getNodeAddress(), reading.id ,true )
+		                        send ack on ucast
+  						    }
+						    ackPacket : {
+						    //printString("ack\n");
+						       unsetTimer(timerChan)
+ 
+								for i = 0 .. data.length - 1 do {
+										send true on dataRequest
+										receive voltage from dataReply
+										data[i] := voltage
+								}
+ 
+								work = createWorkPacket(reading.id, getNodeAddress(), num , data)
+ 
+								num := num + $1
+								setTimer(timerChan, 5.0, false)
+								send work on ucast
+							}
+							replyPacket : {
+							printString("Work packet :")
+							printUnsignedInt(reading.workNum)
+							printString(" with result ")
+							printInt(reading.answer)
+							printString("\n");
+								unsetTimer(timerChan)
+ 
+								//start again
+								req = createRequestPacket(getNodeAddress())
+								setTimer(timerChan, 5.0, false)
+								send any(req) on bcast
+							}
+							default : {}
+				}
+ 
+				//timeout: try again
+				receive tick from timerChan : {
+				//printString("timeout\n");
+					req = createRequestPacket(getNodeAddress())
+					setTimer(timerChan, 5.0, false)          
+					send any(req) on bcast
+				}
+			}
+		}
+    }
+/*****************************************************************************/
+l = new leader()
+ 
+connect l.button 		to buttonSensor.output
+connect l.bcast 		to radio.broadcastSend
+connect l.ucast 		to radio.unicastSend
+connect l.ether 		to radio.received
+ 
+connect l.dataRequest 	to sensors.batteryRequest
+connect l.dataReply 	to sensors.batteryOut

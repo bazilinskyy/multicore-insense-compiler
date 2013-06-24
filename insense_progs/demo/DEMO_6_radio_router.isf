@@ -1,0 +1,57 @@
+// Simple Insense program to route data
+
+// Sensor reading type
+type sensorReading is struct( address addr ; integer cycle ; integer photo ; integer solar ; integer temp ; integer humid )
+
+type IRouter is interface ( in RadioPacket radioInChan ; out any radioOutChan )
+
+// Sensor reader component
+component Router presents IRouter {
+
+	thisNodeAddr = $0
+	
+	constructor() {
+		thisNodeAddr := getNodeAddress()
+	}
+		
+	behaviour {
+	
+		// get something from the radio
+		receive packet from radioInChan
+		printString("\nData received from ")	
+		printUnsignedInt(packet.addr)
+		
+		// only do up-stream routing, i.e. forward packet when it is from a node with a lower node address
+		if packet.addr < thisNodeAddr then { 
+			// project out of any
+			project packet.payload as value onto
+			sensorReading : {
+			   // signal routing with green LED
+			   setGreenLedPower(true)
+			   printString(": forwarding data ")	
+			   // Re-broadcast the reading on its way
+			   // CODEGEN Issue: 
+			   // marshaller only adds serialiser on any constructor
+			   // otherwise could send packet.payload
+			   send any(value) on radioOutChan
+			   // turn green LED back off
+			   setGreenLedPower(false) 		
+		   }
+		   default : {
+			   // signal unknown packet
+			   printString(": was garbage") 
+		   }
+		} else {
+			printString(": not forwarding data as own addr is ")
+			printUnsignedInt(thisNodeAddr)
+		}
+	}				
+} 
+
+
+
+
+router = new Router()
+
+connect router.radioOutChan to radio.broadcastSend
+connect router.radioInChan to radio.received

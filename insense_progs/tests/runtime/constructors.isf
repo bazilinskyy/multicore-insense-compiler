@@ -1,0 +1,51 @@
+// Simple Hello World Insense program
+
+// Interface for Hello component
+type IHello is interface ( out any output )
+
+// Hello World component
+component Hello presents IHello {
+
+	count = 1
+
+	proc print( any val ){
+		outChan = new out any
+		connect outChan to standardOut
+		send val on outChan
+	}
+	
+	constructor() {
+		print(any("called Hello()"))
+	}
+		
+	constructor(integer init){
+		count := init
+		// Send below will cause dealock as it will block until component channel 
+		// output is connected which happens after completion of constructor
+		// To avoid deadlock, perform channel connection in constructor
+//		connect output to standardOut
+//		send any("called Hello(init) with init = ") on output
+//		send any(init) on output
+
+		// Proc call should work from constructor as long as proc
+		// does not rely on instructions such as channle connection that 
+		// are performed after the constructor call
+		print(any("called Hello(init) with init = "))
+		print(any(init))
+
+		// sending values on local constructor channel should work 
+//		outChan = new out any
+//		connect outChan to standardOut
+//		send any("called Hello(init) with init = ") on outChan
+//		send any(init) on outChan
+	}
+	
+	behaviour {
+		send (any("\nHello World ")) on output
+		send (any(count)) on output
+		count := count + 1
+	}
+} 
+
+hello = new Hello(5)
+connect hello.output to standardOut

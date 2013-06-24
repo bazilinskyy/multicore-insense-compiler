@@ -1,0 +1,27 @@
+
+// standard decls
+
+//type ledState is enum { AllOff, RedOnGreenOffBlueOff, GreenOnRedOff
+
+// standard channels
+
+standardOut = new in any 
+leds = new in integer
+button = new out integer
+lightRequest = new in integer
+lightReceive = new out integer
+tempRequest = new in bool
+tempReceive = new out real
+humidityRequest = new in bool
+humidityReceive = new out real
+
+
+radioIn = new in byte[]
+radioOut = new out byte[]
+temperature = new out integer
+humidity = new out integer
+
+
+
+
+

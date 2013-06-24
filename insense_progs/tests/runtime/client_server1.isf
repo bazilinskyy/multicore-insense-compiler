@@ -1,0 +1,222 @@
+// Simple Insense program demonstrating client and server 
+// interaction.
+//
+// - On the server side we have a listener component which can deal incoming
+// service requests for multiple pre-defined services. 
+//
+// - The listener component waits for requests from clients. After receiving a 
+// service request from a client the listener spawns the appropriate server 
+// for the given request and connects the server to the client.
+//
+// - The listener acknowledges successful creation of a server and client connection
+// to the client by sending a signal on the ack channel.
+//
+// - If the listener cannot service the request it notifies the client on the ack channel
+//
+// - The services provided here are very basic services to perfrom calculation (double an integer)
+// and to print out an integer
+//
+// - The clients shown here have two modes of operation in their behaviour loop.
+// They simply request a service when they are not connected to a server and
+// use the service if they are connected to a server.
+//
+// @author jonl
+
+type DoubleIntServiceRequest is struct(out integer clientDataOut ; in integer clientDataIn ; in integer ackChan) 
+type PrintIntServiceRequest is struct(out integer clientDataOut ; in integer ackChan) 
+
+type Server is struct(bool isActive ; any server)
+
+type IPrintable is interface ( out any standardOutChan )
+
+type IDoubleIntServer is interface ( in integer input ; out integer output )
+component DoubleIntServer presents IDoubleIntServer {
+	
+	constructor(){
+	}
+	
+	behaviour{
+		receive anInt from input
+		send 2*anInt on output
+	}
+}
+
+
+type IPrintIntServer is interface ( in integer input ; out any output )
+component PrintIntServer presents IPrintIntServer{
+	
+	constructor(){
+	}
+	
+	behaviour{
+		receive number from input 
+		send (any(number)) on output
+		send(any(", ")) on output
+	}
+}
+
+type IListener is interface( in any listenChan )
+component Listener presents IListener, IPrintable {
+	
+	ackChan = new out integer 
+
+	dummyServer = new Server(false, (any(0))) // inactive dummy server struct with active=false and server=0
+	serverArray = new Server[10] of dummyServer
+	
+	// proc to find next free serverID by looking in the 
+	// serverArray holding references to servers
+	// the array index of where the server can be stored while 
+	// it is running is used as an ID for the server
+	// the proc returns the array index of the first inactive server  
+	// or -1 if the serverArray is full of active servers
+	// 
+	proc nextServerID() : integer{
+		for i = 0 .. serverArray.length-1 do {
+			if !serverArray[i].isActive then return i
+		}
+		return -1
+	}
+	
+	// simple add routine to add servers into the server array
+	proc addServer (any server ; integer serverID) {
+		serverArray[serverID].server := server
+		serverArray[serverID].isActive := true
+	}
+	
+	// proc to send the ACK to the client that requested a server
+	proc sendACK(integer serverID ; in integer chan){
+		connect ackChan to chan // connect the listener's outgoing ackChan to the receiving chan  
+		send serverID on ackChan // send the ack on the server's outgoing ackChan
+		disconnect ackChan      // disconnect the ack chan again
+	}
+	
+	proc spawnDoubleIntServer(DoubleIntServiceRequest request){
+		server = new DoubleIntServer()// create server object
+		serverID = nextServerID() // find next free slot in serverArray
+		if serverID != -1 then {  // we have space for a server		
+			addServer(any(server), serverID)
+			connect server.input to request.clientDataOut 
+			connect server.output to request.clientDataIn
+		}
+		sendACK(serverID, request.ackChan)
+	}
+
+	proc spawnPrintIntServer(PrintIntServiceRequest request){
+		server = new PrintIntServer() // create server object
+		serverID = nextServerID() // find next free slot in serverArray
+		if serverID != -1 then {  // we have space for a server
+			addServer(any(server), serverID)
+			connect server.input to request.clientDataOut
+			connect server.output to standardOut
+		} 
+		sendACK(serverID, request.ackChan)
+	}
+	
+	constructor(){
+	}
+	
+	behaviour {
+		receive someRequest from listenChan
+		project someRequest as request onto
+			DoubleIntServiceRequest : {
+				spawnDoubleIntServer(request)
+			}
+			PrintIntServiceRequest : {
+				spawnPrintIntServer(request)
+			}
+			default : { }
+		
+	}
+	
+}
+	
+
+type IClient is interface ( out any serverRequestChan )
+
+component Client1 presents IClient {
+	
+	number = 1
+	
+	clientDataOut = new out integer
+	ackChan = new in integer
+	serviceRequest = new PrintIntServiceRequest( clientDataOut, ackChan)
+	haveServer = false
+	
+	serverID = -1
+	
+	constructor(){
+	}
+	
+	behaviour{
+		// request server from listener if we don't have one
+		if !haveServer then { 
+			send (any(serviceRequest)) on serverRequestChan
+			receive ack from ackChan
+			if ack != -1 then { // we have got a valid server ID indicating success
+				serverID := ack 
+				haveServer := true
+			}
+		}
+		// if we have server use it
+		if haveServer then {
+			send number on clientDataOut
+			number := number + 1
+		}
+	}
+}
+	
+
+
+
+component Client2 presents IClient, IPrintable {
+	
+	number = 1
+	
+	clientDataOut = new out integer
+	clientDataIn = new in integer
+	ackChan = new in integer
+	serviceRequest = new DoubleIntServiceRequest( clientDataOut, clientDataIn, ackChan)
+	haveServer = false
+	
+	serverID = -1
+	
+	constructor(){
+	}
+	
+	behaviour{
+		// request server from listener if we don't have one
+		if !haveServer then { 
+			send (any("Client: sending service request\n")) on standardOutChan
+			send (any(serviceRequest)) on serverRequestChan
+			receive ack from ackChan
+			if ack != -1 then { // we have got a valid server ID indicating success 
+				serverID := ack 
+				haveServer := true
+			}
+			send (any("Client: got ack = ")) on standardOutChan			
+			send (any(ack)) on standardOutChan			
+			send (any(" from listener\n")) on standardOutChan			
+		}
+		// if we have server use it
+		if haveServer then {
+			send number on clientDataOut
+			receive result from clientDataIn
+			send(any(result)) on standardOutChan
+			send(any(", ")) on standardOutChan
+			number := number + 1
+		}
+	}
+}
+	
+
+
+l = new Listener()
+c1 = new Client1()
+c2 = new Client2()
+
+connect l.standardOutChan to standardOut
+//connect c1.serverRequestChan to l.listenChan
+connect c2.serverRequestChan to l.listenChan
+connect c2.standardOutChan to standardOut
+
+

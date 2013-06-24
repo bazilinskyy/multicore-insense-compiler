@@ -1,0 +1,44 @@
+// Simple Insense program that broadcasts its node address in a data packet to other nodes
+
+type MyPacket is struct (unsigned addr ; unsigned data)
+
+// Interface for Broadcaster
+type IBroadcast is interface (
+		in bool ticks ;
+		out any broadcastSend
+)
+
+proc printMyPacket(MyPacket p){
+	printString("(")
+	printUnsignedInt(p.addr)
+	printString(", ")
+	printUnsignedInt(p.data)
+	printString(")")
+}
+
+// Broadcaster component
+component Broadcast presents IBroadcast {
+	
+	count = $0
+	thisNodeAddr = $0
+	
+	constructor() {
+		thisNodeAddr := getNodeAddress()
+	}
+	
+	behaviour {
+		receive tick from ticks
+		myPacket = new MyPacket(thisNodeAddr, count)
+		printUnsignedInt(thisNodeAddr)
+		printString(": broadcasting packet ")
+		printMyPacket(myPacket)
+		printString("\n")
+		send any(myPacket) on broadcastSend
+		count := count + $1
+	}
+} 
+
+bc = new Broadcast()
+
+connect bc.broadcastSend to radio.broadcastSend
+setTimer(bc.ticks, 10.0, true)

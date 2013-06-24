@@ -1,0 +1,23 @@
+	
+type IHello is interface( in bool ticks )
+	
+component Hello presents IHello {
+	freq = 0.0
+	
+	constructor(real freqIn){
+		freq := freqIn
+		setTimer(ticks, freq, true)
+	}
+	
+	behaviour {
+		receive tick from ticks
+		printReal( freq )
+		printString(" second timer fired\n")
+	}
+}
+
+// Insense main
+
+hello1 = new Hello(5.0)
+hello2 = new Hello(60.0)
+

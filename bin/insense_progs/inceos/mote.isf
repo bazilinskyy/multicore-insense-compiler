@@ -1,0 +1,241 @@
+type ReadingsPacket is struct (
+	integer ttl ;
+	address moteID ;
+	integer temp ;
+	integer humid ;
+	integer photo ;
+	integer solar 
+)
+
+type DiscoverPacket is struct (
+	unsigned origin
+)
+
+type NodePacket is struct (
+	address nodeAddress ;
+	integer distance ;
+	bool hasPath
+)
+
+//router
+type IRouter is interface(
+	in ReadingsPacket ownReadings ;		out RadioPacket sendPacket ;
+	in RadioPacket receivePacket ;		out any broadcastPacket ;
+	in bool timer
+)
+
+component Router presents IRouter {
+	dummypacket = new NodePacket(intToUnsigned(0), 0, false)
+	maxKnownNodes = 20
+	knownNodes = new NodePacket[20] of dummypacket
+	knownNodesSize = 0
+	hasPath = false
+	
+	count = $0
+
+	proc printBool(bool value) {
+		if value then {
+			printString("true")
+		} else {
+			printString("false")
+		}
+	}
+
+	proc getBestRoute(address sender) : NodePacket {
+		bestdist = 0
+		bestnode = dummypacket
+		current = dummypacket
+
+		for i = 0 .. (knownNodesSize - 1) do {
+			current := knownNodes[i]
+			printString("knownNodes[")
+			printInt(i)
+			printString("].nodeAddress: ")
+			printUnsignedInt(knownNodes[i].nodeAddress)
+			printString("\nknownNodes[")
+			printInt(i)
+			printString("].distance: ")
+			printInt(knownNodes[i].distance)
+			printString("\nknownNodes[")
+			printInt(i)
+			printString("].hasPath: ")
+			printBool(knownNodes[i].hasPath)
+			printString("\n")
+			if i == 0 then {
+				bestdist := current.distance
+				bestnode := current
+			} else {
+				if current.distance < bestdist and current.hasPath == true and current.nodeAddress != sender then {
+					bestdist := current.distance
+					bestnode := current
+				}
+			}
+		}
+
+		printString("best node address: ")
+		printUnsignedInt(bestnode.nodeAddress)
+		printString("\n")
+		return bestnode
+	}
+
+	proc replyToDiscover(DiscoverPacket dpacket) {
+		printString("\nreplyToDiscover()\n")
+		bestRoute = getBestRoute( dpacket.origin )
+		newNodePacket = new NodePacket(getNodeAddress(), bestRoute.distance + 1, hasPath)
+		newRadioPacket = new RadioPacket(dpacket.origin, any(newNodePacket))
+		send newRadioPacket on sendPacket 
+	}
+
+	proc broadcastDiscover() {
+		printString("\nBroadcasting discover\n")
+		dp = new DiscoverPacket(getNodeAddress())
+		send any(dp) on broadcastPacket
+	}
+
+	proc clearRoutingTable() {
+		printString("\nClearing known mote table\n")
+		knownNodesSize := 0
+		hasPath := false
+	}
+
+	proc sendReadings(ReadingsPacket readp; address sender) {
+		readp.ttl := readp.ttl - 1
+		printString("\nsendReadings()\n")
+		np = getBestRoute(sender)
+		rp = new RadioPacket(np.nodeAddress, any(readp))
+		send rp on sendPacket 
+	}
+
+	proc appendToRoutingTable(NodePacket np) {
+		if knownNodesSize < maxKnownNodes then {
+			if np.hasPath == true then {
+				hasPath := true
+			}
+			printInt(knownNodesSize)
+			knownNodes[knownNodesSize] := np
+			knownNodesSize := knownNodesSize + 1
+		} else {
+			// replace node with worst path
+		}
+
+	}	
+
+	proc processPacket(RadioPacket rawpacket) {
+		project rawpacket.payload as packet onto
+			ReadingsPacket	: {
+				if hasPath == true and packet.ttl > 0 then { 
+					sendReadings(packet, rawpacket.addr)
+				}
+			}
+			DiscoverPacket	: {
+				if knownNodesSize > 0 then {	//build NodePacket; send NodePacket
+					replyToDiscover(packet)
+				}
+			}
+			NodePacket	: { // add node to routing table
+				printString("\nappendToRoutingTable()\n")
+				printString("nodeAddress: ")
+				printUnsignedInt(packet.nodeAddress)
+				printString("\ndistance: ")
+				printInt(packet.distance)
+				printString("\nhasPath: ")
+				printBool(packet.hasPath)
+				printString("\ntable index: ")
+				appendToRoutingTable(packet)
+			printString("\n")
+			}
+			default		: { } // garbage packet; do nothing
+	}
+
+	constructor() {
+		printString("\nrouter constructor\n")
+		broadcastDiscover()
+		setTimer(timer, 60.0, true)
+	}
+
+	behaviour {
+		printString("\nWaiting for event in Router\n")
+		select{
+			receive rawpacket from receivePacket : { 
+				printString("\nReceived packet\n")
+				
+				processPacket(rawpacket)
+			}
+			receive readings from ownReadings : {
+				printString("\nReceived own reading ")
+				printUnsignedInt(count)
+				printString("\n")
+				count := count + $1
+				if knownNodesSize > 0 then {
+					sendReadings(readings, getNodeAddress())
+				}
+			}
+			receive rebuild from timer : { 	
+				printString("\nrebuild timer\n")
+				clearRoutingTable()
+				broadcastDiscover()
+			}  
+		}
+	}
+
+}
+
+type ISensorReader is interface(
+	out bool tempRequest ; in integer tempValue ;
+	out bool humidRequest ; in integer humidValue ;
+	out bool solarRequest ; in integer solarValue ; 
+	out bool photoRequest ; in integer photoValue ;
+	out ReadingsPacket sendReadings; in bool timerRecv
+)
+
+component SensorReader presents ISensorReader {
+	
+	constructor() {
+		// set a timer and wait
+		setTimer(timerRecv, 5.0, true);
+	}
+
+	behaviour {
+		receive tick from timerRecv
+
+		// "send true on <sensor>Request" is required to trigger a reading to be taken from the sendors
+		send true on tempRequest
+		receive tempReading from tempValue
+
+		send true on humidRequest
+		receive humidityReading from humidValue
+
+		send true on photoRequest
+		receive photoReading from photoValue
+
+		send true on solarRequest
+		receive solarReading from solarValue
+
+		// create a new sensor reading struct and fill it
+		readings = new ReadingsPacket(10, getNodeAddress(), tempReading, humidityReading, photoReading, solarReading)
+
+		// send to router
+		send readings on sendReadings
+
+
+	}
+}
+
+router = new Router()
+reader =  new SensorReader()
+
+//Router
+connect router.receivePacket to radio.received
+connect router.sendPacket to radio.unicastSend
+connect router.broadcastPacket to radio.broadcastSend
+
+//SensorReader
+connect reader.sendReadings to router.ownReadings
+connect reader.tempRequest to sensors.tempRequest
+connect reader.tempValue to sensors.tempOut
+connect reader.humidRequest to sensors.humidRequest
+connect reader.humidValue to sensors.humidOut
+connect reader.photoRequest to sensors.photoRequest
+connect reader.photoValue to sensors.photoOut
+connect reader.solarRequest to sensors.solarRequest
+connect reader.solarValue to sensors.solarOut

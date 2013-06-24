@@ -1,0 +1,122 @@
+/*
+ * Insense component that multiples two matrices. Results are outputted on the screen.
+ 
+ *
+ *
+ * Copyright (c) 2013, Pavlo Bazilinskyy <pavlo.bazilinskyy@gmail.com>
+ * School of Computer Science, St. Andrews University
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+
+type IHello is interface () // Interface for Hello component
+
+// Hello World component with string passed as an argument
+component MatrixMultiplication presents IHello {
+
+	// c = a * b
+	a = new integer[2][3] of 0
+	b = new integer[3][2] of 0
+	c = new integer[2][2] of 0 // Matrix to store results of multiplication
+	id = 0 // ID of the component instance
+
+	constructor(integer number) {
+		// Set the first matrix to be integers starting from 1
+		count = 1
+		for i = 0 .. a.length-1 do {
+			for j = 0 .. a[i].length-1 do {
+				a[i][j] := count
+				count := count + 1
+			}
+		}
+		
+		// Set the second matrix to be integers starting from 7
+		for i = 0 .. b.length-1 do {
+			for j = 0 .. b[i].length-1 do {
+				b[i][j] := count
+				count := count + 1
+			}
+		}
+		
+		id := number
+	}
+		
+	behaviour {
+		printString("\n\nSTART OF BAHAVIOUR for ")
+		printInt(id)
+		printString("\n\n")
+	
+		numberCalc = 0
+	
+		// Perform multiplication
+		for k = 0 .. b[0].length-1 do {
+			for i = 0 .. a.length-1 do {
+				// Multiply by columns in matrix b
+				sum = 0
+				for j = 0 .. a[0].length-1 do {
+					sum := sum + a[i][j] * b[j][k]
+					numberCalc := numberCalc + 1
+				}
+				c[i][k] := sum
+			}
+		}
+		printInt(numberCalc)
+		printString(" calculations performed.")
+
+		// Output Matrix a
+		printString("\nMatrix a:\n")
+		for i = 0 .. c.length-1 do {
+			for j = 0 .. a[i].length-1 do {
+				printInt(a[i][j])
+				printString(", ")
+			}
+			printString("\n")
+		}
+		
+		// Output Matrix b
+		printString("\nMatrix b:\n")
+		for i = 0 .. b.length-1 do {
+			for j = 0 .. b[i].length-1 do {
+				printInt(b[i][j])
+				printString(", ")
+			}
+			printString("\n")
+		}
+
+		
+		// Output matrix received after multiplication
+		printString("\nMultiplied matrices:\n")
+		for i = 0 .. c.length-1 do {
+			for j = 0 .. c[i].length-1 do {
+				printInt(c[i][j])
+				printString(", ")
+			}
+			printString("\n")
+		}
+		
+		printString("\n\nEND OF BAHAVIOUR\n\n")
+	}
+}
+
+// Create five components that perform matrix multiplication
+matrix1 = new MatrixMultiplication(1)
+matrix2 = new MatrixMultiplication(2)
+matrix3 = new MatrixMultiplication(3)
+matrix4 = new MatrixMultiplication(4)
+matrix5 = new MatrixMultiplication(5)

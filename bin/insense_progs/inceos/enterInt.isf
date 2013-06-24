@@ -1,0 +1,20 @@
+	
+type IProg is interface( )
+	
+component Prog presents IProg {
+
+	constructor(){
+	}
+	
+	behaviour {
+		printString("\nPlease enter an integer\n");
+		i = parseInt(getString())
+		printString("You enetered the number: ")
+		printInt(i)
+	}
+}
+
+// Insense main
+
+prog = new Prog()
+

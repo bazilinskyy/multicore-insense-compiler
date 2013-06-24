@@ -1,0 +1,30 @@
+	
+
+type IProg is interface( )
+
+component Prog presents IProg {
+
+	constructor(){
+	}
+	
+	behaviour {
+		rs1 = "-3.14"
+		rs2 = "10.127"
+		r1 = parseReal(rs1)
+		r2 = parseReal(rs2)
+		printString("Strings ")
+		printString(rs1)
+		printString(" and ")
+		printString(rs2)
+		printString(" parsed to reals as ")
+		printReal(r1)
+		printString(" and ")
+		printReal(r2)
+		printString("\n")
+	}
+}
+
+// Insense main
+
+prog = new Prog()
+

@@ -1,0 +1,22 @@
+/*
+Serial test
+*/
+
+type Itest is interface (in string pc)
+
+component test presents Itest{
+
+	constructor() {}
+	
+	behaviour{
+		printString("Wait for input : ")
+		receive str from pc
+		
+		printString(str)
+		printString("\n")
+	}
+}
+
+t = new test()
+
+connect t.pc to serial.incoming

@@ -1,0 +1,43 @@
+// Test multiple component definition
+
+type foo is interface( in integer ticker,tocker; out integer bob )
+
+component Radio presents foo {
+	
+	size = 0;
+	
+	constructor() {
+	}
+	
+	constructor( in integer startticks ) {
+		ticker := startticks;
+	}
+	
+	constructor( in integer startticks; integer framesize ) { 
+		ticker := startticks;
+	}	
+	
+	behaviour {
+		
+	}
+}
+ 
+ type bobby is interface( in integer bobber )
+ 
+ component Bobber presents bobby {
+	
+	size = 0;
+	
+	constructor() {
+	}
+	
+	behaviour {
+		
+	}
+}
+
+bob = new Radio();
+
+
+
+

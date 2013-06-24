@@ -1,0 +1,15 @@
+// Tests function definition and call (multiple calls with errors)
+
+proc fn( integer i,b; string s ) : integer {
+	return i
+}
+
+ ii = fn( 1,3 );
+ 
+ jj = fn( 4,5,"hi", "ho" );
+
+ ff = fn( "hi", 6, 7 );
+
+
+ s = fn( 8,9, "ho" );
+

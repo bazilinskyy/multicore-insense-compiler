@@ -1,0 +1,126 @@
+// Simple Insense program requesting sensor readings and printing out results on standard output and
+// using the LEDs to indicate increases in temperature (red), humidity (green) and light (blue).
+// The SenorReader component gets readings from the sensors, puts them into a struct and sends the struct to 
+// the PrintOutput and LedOutput components for printing and LED display respectively.
+// It also broadcasts the data out over the radio.
+
+
+// Apart from the three components defined here, the Insense Runtime also defines components for each of
+// the following: LEDs, visible light (photo) sensor, total solar radiation light (solar) sensor,
+// temperature sensor, humidity sensor, button sensor, as well as a component for standard output.
+// The button sensor is not used in the program.
+
+// Sensor reading type
+type sensorReading is struct( address addr ; integer cycle ; integer photo ; integer solar ; integer temp ; integer humid )
+
+
+// Interface for Sensor Reader
+type ISensorReader is interface (in bool ticker ; out sensorReading printerChan ; out sensorReading ledsChan ; out any radioChan)
+
+// Sensor reader component
+component SensorReader presents ISensorReader {
+
+	addr = $0
+	cycle = 0
+	
+	constructor() {
+		addr := getNodeAddress()
+	}
+		
+	behaviour {
+		// wait for tick
+		receive tick from ticker
+		
+		// get photo sensor reading
+		photoValue = photoReading()
+		
+		// get solar sensor reading
+		solarValue = solarReading()
+		
+		// get temp reading
+		tempValue = tempReading()
+
+		// get humidity reading 
+		humidityValue = humidReading()
+		
+		// put readings into struct
+		reading = new sensorReading(addr, cycle, photoValue, solarValue, tempValue, humidityValue)
+		
+		send reading on ledsChan
+		send reading on printerChan
+		send any(reading) on radioChan
+
+		// increment cycle counter
+		cycle := cycle + 1
+	}
+} 
+
+
+// Interface for standard output printer
+type IPrintOutput is interface ( in sensorReading input )
+
+// Standard output printer component
+component PrintOutput presents IPrintOutput {
+
+	constructor() {	
+	}
+		
+	behaviour {
+		// get reading struct
+		receive reading from input
+		
+		// send text+readings in struct on stdout
+		printString("It ")
+		printInt(reading.cycle)
+		printString(":\tphoto = ")
+		printInt(reading.photo)
+		printString("\tsolar = ")
+		printInt(reading.solar)
+		printString("\ttemp = ")
+		printInt(reading.temp)
+		printString("\thumid = ")
+		printInt(reading.humid)
+		printString("\n")
+	}
+} 
+
+
+
+// Interface for LED output component
+type ILedOutput is interface ( in sensorReading input )
+
+// LED output component
+component LedOutput presents ILedOutput {
+
+	avgTemp = 0
+	avgSolar = 0
+	avgHumid = 0
+	
+	constructor() {	
+	}
+		
+	behaviour {
+		// get sensor readings
+		receive reading from input 
+
+		// represent readings via LEDs, R/G/B for high Temp/Humidity/Light 
+		setBlueLedPower((reading.solar - avgSolar) > 20)
+		setGreenLedPower((reading.humid - avgHumid ) > 20)
+		setRedLedPower((reading.temp - avgTemp) > 20)
+		
+		// adjust averages
+		avgTemp := avgTemp + (reading.temp - avgTemp)/4
+		avgHumid := avgHumid + (reading.humid - avgHumid)/2
+		avgSolar := avgSolar + (reading.solar - avgSolar)/8
+	}
+} 
+
+lo = new LedOutput()
+po = new PrintOutput()
+sr = new SensorReader()
+
+
+connect sr.printerChan to po.input
+connect sr.ledsChan to lo.input
+connect sr.radioChan to radio.broadcastSend
+setTimer(sr.ticker, 1.0, true)
