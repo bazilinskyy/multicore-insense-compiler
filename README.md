@@ -1,7 +1,7 @@
 # Multi-core Insense (compiler)
 
 ## MSc thesis
-This project is source code for my [MSc thesis](hhttps://bazilinskyy.github.io/papers/bazilinskyy2013multi.pdf). The joint degree was obtained at [St Andrews Unviversity](https://www.st-andrews.ac.uk)/[Maynooth University](https://www.maynoothuniversity.ie).
+This project is source code for my [MSc thesis](https://bazilinskyy.github.io/papers/bazilinskyy2013multi.pdf). The joint degree was obtained at [St Andrews Unviversity](https://www.st-andrews.ac.uk)/[Maynooth University](https://www.maynoothuniversity.ie).
 
 ## Description
 Compiler for the multi-core version of [Insense language](http://insense.cs.st-andrews.ac.uk).
