@@ -1,7 +1,10 @@
-Multi-Core-Insense-Compiler
-===========================
+# Multi-core Insense (compiler)
 
-Compiler for the multi-core version of Insense language (http://insense.cs.st-andrews.ac.uk).
+## MSc thesis
+This project is source code for my [MSc thesis](hhttps://bazilinskyy.github.io/papers/bazilinskyy2013multi.pdf). The joint degree was obtained at [St Andrews Unviversity](https://www.st-andrews.ac.uk)/[Maynooth University](https://www.maynoothuniversity.ie).
+
+## Description
+Compiler for the multi-core version of [Insense language](http://insense.cs.st-andrews.ac.uk).
 
 Motivation for this project is to investigate benefits of utilisation of private heaps for memory management and static thread placement for optimising performance and cache usage. Insense, which is a component-based programming language developed in the University of St. Andrews that abstracts over complications of memory management, concurrency control and synchronisation, was used for this study. Two memory management schemes are under investigation: use of a single shared heap and use of multiple private heaps. Further, three thread placement schemes are designed and implemented: 1) static placement, where Insense components are distributed evenly among cores; 2) where all components are placed on a single core; 3) locating Insense components based on frequency of communicating with other components.
 
